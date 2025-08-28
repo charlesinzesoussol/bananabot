@@ -150,24 +150,24 @@ class BananaBot(commands.Bot):
         async def _handle_help(ctx: commands.Context):
             """Handle help command."""
             embed = discord.Embed(
-                title="🍌 BananaBot Commands v1.2",
+                title="🍌 BananaBot Commands v1.3",
                 description="Your friendly AI image creation assistant",
                 color=0xFFD700
             )
             
             embed.add_field(
                 name="🎨 Create Images",
-                value="`!generate <prompt>` - Create an image from your description\\n`!cheap <prompt1> <prompt2> ...` - Create multiple images at once\\n`!gallery` - View your recent creations",
+                value="`!generate <prompt>` - Create an image from your description\\n`!gallery` - View your recent creations\\n`!test` - Check if bot is working",
                 inline=False
             )
             
             embed.add_field(
                 name="💡 Tips",
-                value="• Attach an image to `!generate` to edit it\\n• Use detailed prompts for better results\\n• All your images are saved in your personal gallery\\n• Try `!cheap` for creating several images together",
+                value="• Attach an image to `!generate` to edit it\\n• Use detailed prompts for better results\\n• All your images are saved in your personal gallery\\n• Try different art styles in your prompts",
                 inline=False
             )
             
-            embed.set_footer(text="Made with 🍌 | v1.2 • Updated just now | Powered by Google Gemini")
+            embed.set_footer(text="Made with 🍌 | v1.3 • Updated just now | Powered by Google Gemini")
             
             await ctx.send(embed=embed)
         
@@ -176,86 +176,6 @@ class BananaBot(commands.Bot):
         self._handle_gallery = _handle_gallery  
         self._handle_help = _handle_help
         
-        # Add batch handler
-        async def _handle_batch(ctx: commands.Context, prompts: List[str]):
-            """Handle batch generation with cost optimization."""
-            user_id = str(ctx.author.id)
-            
-            if len(prompts) < 1:
-                await ctx.send("❌ Please provide at least one prompt. Example: `!cheap sunset beach \"cute cat\"`")
-                return
-            
-            if len(prompts) > 10:
-                await ctx.send("❌ Batch mode limited to 10 prompts at once for optimal processing.")
-                return
-            
-            # If only one prompt, use single batch optimization
-            if len(prompts) == 1:
-                await self._handle_generate(ctx, prompts[0])
-                return
-            
-            await ctx.send(f"⚡ Creating {len(prompts)} images for you...")
-            
-            try:
-                # Submit batch job
-                batch_id = str(uuid.uuid4())[:8]
-                
-                # Process batch with cost optimization
-                results = await self.batch_processor.process_batch(prompts, user_id, batch_id)
-                
-                if not results:
-                    await ctx.send("❌ Batch processing failed. No images generated.")
-                    return
-                
-                # Save results to gallery and send
-                gallery = UserGallery.load(user_id)
-                files = []
-                embed = discord.Embed(
-                    title="⚡ Your images are ready!",
-                    description=f"Created {len(results)}/{len(prompts)} images from your prompts",
-                    color=0xFF4500
-                )
-                
-                for i, (prompt, image_bytes) in enumerate(results):
-                    work = ImageWork(
-                        id=str(uuid.uuid4())[:8],
-                        user_id=user_id,
-                        prompt=prompt,
-                        image_url=f"batch_{batch_id}_{i}.png",
-                        generation_type="batch",
-                        batch_id=batch_id,
-                        cost=0.00125  # Batch pricing (50% off)
-                    )
-                    gallery.add_work(work)
-                    
-                    files.append(discord.File(io.BytesIO(image_bytes), filename=f"{work.id}.png"))
-                    
-                    if i < 5:  # Show first 5 prompts in embed
-                        embed.add_field(
-                            name=f"🍌 `{work.id}`",
-                            value=prompt[:50] + ('...' if len(prompt) > 50 else ''),
-                            inline=True
-                        )
-                
-                embed.set_footer(text=f"All images saved to your gallery | Use !gallery to see everything")
-                
-                # Send images
-                if len(files) <= 10:  # Discord limit
-                    await ctx.send(files=files, embed=embed)
-                else:
-                    # Send in chunks
-                    for chunk_start in range(0, len(files), 10):
-                        chunk = files[chunk_start:chunk_start+10]
-                        if chunk_start == 0:
-                            await ctx.send(files=chunk, embed=embed)
-                        else:
-                            await ctx.send(files=chunk)
-                
-            except Exception as e:
-                logger.error(f"Batch generation failed: {e}")
-                await ctx.send("❌ Batch generation failed. Please try again or use !generate for single images.")
-        
-        self._handle_batch = _handle_batch
     
     def _add_prefix_commands(self) -> None:
         """Add all prefix commands to the bot."""
@@ -270,10 +190,6 @@ class BananaBot(commands.Bot):
             """View your recent image works."""
             await self._handle_gallery(ctx, limit)
         
-        @self.command(name='cheap', aliases=['c', 'batch'])
-        async def cheap(ctx: commands.Context, *prompts: str):
-            """Generate multiple images in batch mode for maximum cost savings (50% off)."""
-            await self._handle_batch(ctx, list(prompts))
         
         @self.command(name='help', aliases=['h'])
         async def help_command(ctx: commands.Context):
@@ -283,7 +199,7 @@ class BananaBot(commands.Bot):
         @self.command(name='test', aliases=['ping'])
         async def test_command(ctx: commands.Context):
             """Test if the bot is responding to commands."""
-            await ctx.send("🍌 Bot is working! Commands are active v1.2")
+            await ctx.send("🍌 Bot is working! Commands are active v1.3")
     
     async def setup_hook(self) -> None:
         """
