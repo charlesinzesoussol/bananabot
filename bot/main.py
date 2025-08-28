@@ -150,7 +150,7 @@ class BananaBot(commands.Bot):
         async def _handle_help(ctx: commands.Context):
             """Handle help command."""
             embed = discord.Embed(
-                title="🍌 BananaBot Commands v1.3",
+                title="🍌 BananaBot Commands v1.4",
                 description="Your friendly AI image creation assistant",
                 color=0xFFD700
             )
@@ -167,7 +167,13 @@ class BananaBot(commands.Bot):
                 inline=False
             )
             
-            embed.set_footer(text="Made with 🍌 | v1.3 • Updated just now | Powered by Google Gemini")
+            embed.add_field(
+                name="⚠️ Important",
+                value="• Use `!` commands (not `/` commands)\\n• Old slash commands have been removed\\n• Type `!help` to see this message",
+                inline=False
+            )
+            
+            embed.set_footer(text="Made with 🍌 | v1.4 • Slash commands cleared | Powered by Google Gemini")
             
             await ctx.send(embed=embed)
         
@@ -199,7 +205,7 @@ class BananaBot(commands.Bot):
         @self.command(name='test', aliases=['ping'])
         async def test_command(ctx: commands.Context):
             """Test if the bot is responding to commands."""
-            await ctx.send("🍌 Bot is working! Commands are active v1.3")
+            await ctx.send("🍌 Bot is working! Commands are active v1.4 - Slash commands cleared!")
     
     async def setup_hook(self) -> None:
         """
@@ -208,6 +214,11 @@ class BananaBot(commands.Bot):
         logger.info("Running setup hook...")
         
         try:
+            # CRITICAL: Clear any old slash commands
+            self.tree.clear()
+            await self.tree.sync()
+            logger.info("Cleared old slash commands from Discord")
+            
             # Initialize services
             await self._initialize_services()
             
