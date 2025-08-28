@@ -66,7 +66,7 @@ class BananaBot(commands.Bot):
                         image_data = await attachment.read()
                         user_images.append(image_data)
             
-            await ctx.send(f"🎨 Generating image: _{prompt}_")
+            await ctx.send(f"🎨 Creating your image: _{prompt}_")
             
             try:
                 # COST OPTIMIZATION: Always use batch mode for 50% savings
@@ -106,11 +106,11 @@ class BananaBot(commands.Bot):
                 # Send image
                 file = discord.File(io.BytesIO(image_bytes), filename=f"{work.id}.png")
                 embed = discord.Embed(
-                    title="🍌 Image Generated!",
+                    title="🍌 Here's your image!",
                     description=f"**Prompt:** {prompt}\\n**ID:** `{work.id}`",
                     color=0xFFD700
                 )
-                embed.set_footer(text=f"Use !edit {work.id} to modify this image")
+                embed.set_footer(text=f"Use !gallery to see all your creations")
                 
                 await ctx.send(file=file, embed=embed)
                 
@@ -130,8 +130,8 @@ class BananaBot(commands.Bot):
                 return
             
             embed = discord.Embed(
-                title="🖼️ Your Image Gallery",
-                description=f"Showing {len(recent_works)} most recent works",
+                title="🖼️ Your Gallery",
+                description=f"Here are your {len(recent_works)} most recent creations",
                 color=0x9932CC
             )
             
@@ -143,7 +143,7 @@ class BananaBot(commands.Bot):
                     inline=False
                 )
             
-            embed.set_footer(text=f"Total works: {gallery.total_generations} | Use !edit <ID> to modify")
+            embed.set_footer(text=f"Total creations: {gallery.total_generations} | Use !generate to make more")
             
             await ctx.send(embed=embed)
         
@@ -151,29 +151,23 @@ class BananaBot(commands.Bot):
             """Handle help command."""
             embed = discord.Embed(
                 title="🍌 BananaBot Commands",
-                description="AI Image Generation Bot with COST-OPTIMIZED Batch Processing",
+                description="Your friendly AI image creation assistant",
                 color=0xFFD700
             )
             
             embed.add_field(
-                name="🎨 Generation Commands (AUTO BATCH MODE - 50% CHEAPER)",
-                value="`!generate <prompt>` - Generate image (uses batch mode for 50% savings)\\n`!cheap <prompt1> <prompt2> ...` - Bulk generation (max savings)\\n`!gallery [limit]` - View your recent works",
-                inline=False
-            )
-            
-            embed.add_field(
-                name="💰 Cost Optimization",
-                value="• ALL commands use Google Batch API (50% cost reduction)\\n• Single images processed via batch mode\\n• Multiple images get maximum bulk discounts\\n• Average cost: $0.00125 per image (vs $0.0025 standard)",
+                name="🎨 Create Images",
+                value="`!generate <prompt>` - Create an image from your description\\n`!cheap <prompt1> <prompt2> ...` - Create multiple images at once\\n`!gallery` - View your recent creations",
                 inline=False
             )
             
             embed.add_field(
                 name="💡 Tips",
-                value="• Attach images to `!generate` for editing\\n• Use `!cheap prompt1 prompt2 prompt3` for multiple images\\n• All images saved to your personal gallery\\n• Batch mode is always enabled for cost savings",
+                value="• Attach an image to `!generate` to edit it\\n• Use detailed prompts for better results\\n• All your images are saved in your personal gallery\\n• Try `!cheap` for creating several images together",
                 inline=False
             )
             
-            embed.set_footer(text="Made with 🍌 | Powered by Google Gemini Batch API (50% cheaper)")
+            embed.set_footer(text="Made with 🍌 | Powered by Google Gemini")
             
             await ctx.send(embed=embed)
         
@@ -200,7 +194,7 @@ class BananaBot(commands.Bot):
                 await self._handle_generate(ctx, prompts[0])
                 return
             
-            await ctx.send(f"⚡ Starting COST-OPTIMIZED batch generation for {len(prompts)} images (50% savings)...")
+            await ctx.send(f"⚡ Creating {len(prompts)} images for you...")
             
             try:
                 # Submit batch job
@@ -217,8 +211,8 @@ class BananaBot(commands.Bot):
                 gallery = UserGallery.load(user_id)
                 files = []
                 embed = discord.Embed(
-                    title="⚡ COST-OPTIMIZED Batch Complete!",
-                    description=f"Generated {len(results)}/{len(prompts)} images\\n💰 **Cost:** ${len(results) * 0.00125:.4f} (50% savings applied)",
+                    title="⚡ Your images are ready!",
+                    description=f"Created {len(results)}/{len(prompts)} images from your prompts",
                     color=0xFF4500
                 )
                 
@@ -243,7 +237,7 @@ class BananaBot(commands.Bot):
                             inline=True
                         )
                 
-                embed.set_footer(text=f"💰 Saved ${len(results) * 0.00125:.4f} with batch mode | Use !gallery to see all works")
+                embed.set_footer(text=f"All images saved to your gallery | Use !gallery to see everything")
                 
                 # Send images
                 if len(files) <= 10:  # Discord limit
@@ -333,7 +327,10 @@ class BananaBot(commands.Bot):
     async def _load_commands(self) -> None:
         """Load prefix commands."""
         try:
-            # Add inline commands directly to the bot
+            # First add command handlers
+            self._add_command_handlers()
+            
+            # Then add prefix commands
             self._add_prefix_commands()
             
             logger.info("Prefix commands loaded successfully")
@@ -355,14 +352,14 @@ class BananaBot(commands.Bot):
         await self.change_presence(
             activity=discord.Activity(
                 type=discord.ActivityType.watching,
-                name="for /generate commands"
+                name="for !generate commands"
             ),
             status=discord.Status.online
         )
         
-        # Log command tree status
-        commands = self.tree.get_commands()
-        logger.info(f"Loaded {len(commands)} commands: {[cmd.name for cmd in commands]}")
+        # Log prefix commands status
+        commands = [cmd.name for cmd in self.commands]
+        logger.info(f"Loaded {len(commands)} prefix commands: {commands}")
     
     async def on_error(self, event_method: str, *args, **kwargs) -> None:
         """Handle general bot errors."""
@@ -398,7 +395,7 @@ def create_bot() -> BananaBot:
     # Create bot instance
     bot = BananaBot()
     
-    logger.info("Bot created successfully")
+    logger.info("Bot created successfully with prefix commands")
     return bot
 
 async def main() -> None:
