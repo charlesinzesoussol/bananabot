@@ -28,9 +28,9 @@ class BananaBot(commands.Bot):
     
     def __init__(self):
         """Initialize the bot with required intents and services."""
-        # Setup intents - try without message_content first
+        # CRITICAL: Setup intents for prefix commands
         intents = discord.Intents.default()
-        intents.message_content = False  # Try without privileged intent first
+        intents.message_content = True  # Required for prefix commands
         
         super().__init__(
             command_prefix='!',
