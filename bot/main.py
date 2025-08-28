@@ -150,7 +150,7 @@ class BananaBot(commands.Bot):
         async def _handle_help(ctx: commands.Context):
             """Handle help command."""
             embed = discord.Embed(
-                title="🍌 BananaBot Commands",
+                title="🍌 BananaBot Commands v1.2",
                 description="Your friendly AI image creation assistant",
                 color=0xFFD700
             )
@@ -167,7 +167,7 @@ class BananaBot(commands.Bot):
                 inline=False
             )
             
-            embed.set_footer(text="Made with 🍌 | Powered by Google Gemini")
+            embed.set_footer(text="Made with 🍌 | v1.2 • Updated just now | Powered by Google Gemini")
             
             await ctx.send(embed=embed)
         
@@ -279,6 +279,11 @@ class BananaBot(commands.Bot):
         async def help_command(ctx: commands.Context):
             """Show help information."""
             await self._handle_help(ctx)
+        
+        @self.command(name='test', aliases=['ping'])
+        async def test_command(ctx: commands.Context):
+            """Test if the bot is responding to commands."""
+            await ctx.send("🍌 Bot is working! Commands are active v1.2")
     
     async def setup_hook(self) -> None:
         """
