@@ -9,8 +9,8 @@
 cp .env.example .env
 
 # Edit with your credentials
-DISCORD_TOKEN=MTQxMDc0NDIyNTEyMDkxNTQ5OA.GHHJSf.tIrWy0-pe7QxMCPRdHl_c2iuXrFimnbni9EyLE
-GEMINI_API_KEY=AIzaSyCkKcTbmYpN2Vax6fbHymuwbiY8lWC5MOM
+DISCORD_TOKEN=your_discord_bot_token_here
+GEMINI_API_KEY=your_gemini_api_key_here
 GUILD_ID=your_test_server_id  # Optional for testing
 LOG_LEVEL=INFO
 MAX_REQUESTS_PER_HOUR=10
