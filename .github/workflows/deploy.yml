@@ -33,9 +33,10 @@ jobs:
           
           # Stop existing bot processes
           echo "Stopping existing bot..."
-          pkill -f "python.*start.py" || true
-          pkill -f "python.*slash_bot.py" || true
-          sleep 2
+          timeout 10s pkill -f "python.*start.py" || true
+          timeout 10s pkill -f "python.*slash_bot.py" || true
+          timeout 5s pkill -f "python" || true
+          echo "Bot processes stopped"
           
           # Update repository
           echo "Updating code..."
