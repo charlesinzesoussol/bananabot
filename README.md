@@ -17,6 +17,10 @@ Discord AI image generation bot using Google Gemini 2.5 Flash.
 3. Add your tokens to `.env`
 4. Run: `python start.py`
 
+## VPS Deployment
+
+Automatic deployment via GitHub Actions. Every push to main deploys to VPS.
+
 ## Requirements
 
 - Python 3.9+
