@@ -87,14 +87,20 @@ jobs:
             apt-get install -y python3 python3-venv python3-pip systemd curl wget git
             
             # Create virtual environment
-            if [ ! -d "venv_linux" ]; then
-              python3 -m venv venv_linux
-            fi
+            echo "Creating virtual environment..."
+            rm -rf venv_linux  # Remove if exists
+            python3 -m venv venv_linux
+            
+            # Activate and install dependencies
+            echo "Activating virtual environment..."
             source venv_linux/bin/activate
+            echo "Virtual environment activated successfully"
             
             # Install dependencies
+            echo "Installing dependencies..."
             pip install --upgrade pip
             pip install -r requirements.txt
+            echo "Dependencies installed successfully"
             
             # Create data directories
             mkdir -p /opt/bananabot/data
@@ -130,7 +136,8 @@ jobs:
             # Set secure permissions on env file
             chmod 600 .env
             
-            # Check volume paths
+            # Check volume paths (ensure we're in the right directory)
+            cd /opt/bananabot
             python3 check_volume.py || echo "Volume check completed"
             
             echo "✅ Environment configured"
