@@ -46,9 +46,28 @@ jobs:
           source venv_linux/bin/activate
           pip install --no-cache-dir -r requirements.txt
           
-          # Create .env from example if needed
-          [ ! -f ".env" ] && cp .env.example .env || true
+          # Create .env file from GitHub secrets
+          echo "Creating .env file from GitHub secrets..."
+          cat > .env << EOF
+          DISCORD_TOKEN=${{ secrets.DISCORD_TOKEN }}
+          GUILD_ID=${{ secrets.GUILD_ID }}
+          GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+          LOG_LEVEL=INFO
+          MAX_REQUESTS_PER_HOUR=10
+          ENABLE_BATCH_PROCESSING=false
+          BATCH_SIZE=10
+          BATCH_TIMEOUT=60
+          ENABLE_CONTENT_FILTER=true
+          EOF
           
           # Start bot
           nohup python start.py > bananabot.log 2>&1 &
-          echo "✅ BananaBot deployment started!"
+          sleep 2
+          
+          # Check if bot started
+          if pgrep -f "python.*start.py" > /dev/null; then
+            echo "✅ BananaBot deployed and started successfully!"
+          else
+            echo "❌ Bot failed to start, check logs:"
+            cat bananabot.log
+          fi
