@@ -28,7 +28,38 @@ jobs:
       run: |
         echo "No tests configured yet"
         
-    - name: Deploy to VPS
+    - name: Setup Bot Directory
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.VPS_HOST }}
+        username: ${{ secrets.VPS_USER }}
+        key: ${{ secrets.VPS_SSH_KEY }}
+        port: 22
+        timeout: 60s
+        script: |
+          echo "🍌 Setting up bot directory..."
+          mkdir -p /opt/bananabot
+          cd /opt/bananabot
+          pkill -f "python.*start.py" || true
+          pkill -f "python.*slash_bot.py" || true
+          
+    - name: Update Code
+      uses: appleboy/ssh-action@v1.0.0  
+      with:
+        host: ${{ secrets.VPS_HOST }}
+        username: ${{ secrets.VPS_USER }}
+        key: ${{ secrets.VPS_SSH_KEY }}
+        port: 22
+        timeout: 120s
+        script: |
+          cd /opt/bananabot
+          if [ ! -d ".git" ]; then
+            git clone --depth 1 https://github.com/charlesinzesoussol/bananabot.git .
+          else
+            git pull origin main
+          fi
+          
+    - name: Setup Environment
       if: github.ref == 'refs/heads/main'
       uses: appleboy/ssh-action@v1.0.0
       with:
@@ -37,36 +68,30 @@ jobs:
         key: ${{ secrets.VPS_SSH_KEY }}
         port: 22
         timeout: 300s
-        command_timeout: 180s
         script: |
-          set -e
-          echo "🍌 Starting BananaBot deployment..."
-          
-          # Setup directories
-          mkdir -p /opt/bananabot
           cd /opt/bananabot
-          
-          # Stop existing bot
-          pkill -f "python.*start.py" || true
-          pkill -f "python.*slash_bot.py" || true
-          
-          # Setup repository
-          if [ ! -d ".git" ]; then
-            git clone --depth 1 https://github.com/charlesinzesoussol/bananabot.git .
-          else
-            git pull origin main
-          fi
-          
-          # Setup Python environment (quick)
           if [ ! -d "venv_linux" ]; then
             python3 -m venv venv_linux
             source venv_linux/bin/activate
-            pip install --no-cache-dir -r requirements.txt
+            pip install --upgrade pip wheel
+            pip install --only-binary=all discord.py google-generativeai python-dotenv aiohttp pydantic || pip install discord.py google-generativeai python-dotenv aiohttp pydantic
           else
             source venv_linux/bin/activate
-            pip install --no-cache-dir --upgrade -r requirements.txt
+            pip install --upgrade --only-binary=all discord.py google-generativeai python-dotenv aiohttp pydantic || pip install --upgrade discord.py google-generativeai python-dotenv aiohttp pydantic
           fi
           
-          # Start bot
+    - name: Start Bot
+      if: github.ref == 'refs/heads/main'
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.VPS_HOST }}
+        username: ${{ secrets.VPS_USER }}
+        key: ${{ secrets.VPS_SSH_KEY }}
+        port: 22
+        timeout: 30s
+        script: |
+          cd /opt/bananabot
+          source venv_linux/bin/activate
           nohup python start.py > bananabot.log 2>&1 &
+          sleep 1
           echo "✅ Bot deployed and started!"
