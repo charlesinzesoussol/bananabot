@@ -1,25 +1,85 @@
-name: Deploy to VPS
+name: Deploy BananaBot to VPS
 
 on:
   push:
     branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
     
     steps:
-    - name: Deploy to VPS
-      uses: appleboy/ssh-action@v0.1.10
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Deploy BananaBot to VPS
+      uses: appleboy/ssh-action@v1.0.3
       with:
         host: ${{ secrets.VPS_HOST }}
         username: ${{ secrets.VPS_USER }}
         key: ${{ secrets.VPS_SSH_KEY }}
+        port: 22
+        timeout: 10m
         script: |
-          cd /opt/bananabot || mkdir -p /opt/bananabot && cd /opt/bananabot
-          pkill -f python || true
-          git clone https://github.com/charlesinzesoussol/bananabot.git . || git pull
-          python3 -m venv venv_linux || true
+          echo "🍌 Starting BananaBot deployment..."
+          
+          # Setup bot directory
+          sudo mkdir -p /opt/bananabot
+          sudo chown $USER:$USER /opt/bananabot
+          cd /opt/bananabot
+          
+          # Stop existing bot processes
+          echo "Stopping existing bot..."
+          sudo pkill -f "python.*start.py" || true
+          sudo pkill -f "python.*slash_bot.py" || true
+          sleep 2
+          
+          # Update repository
+          echo "Updating code..."
+          if [ ! -d ".git" ]; then
+            git clone https://github.com/charlesinzesoussol/bananabot.git .
+          else
+            git fetch origin
+            git reset --hard origin/main
+            git clean -fd
+          fi
+          
+          # Setup Python virtual environment
+          echo "Setting up Python environment..."
+          if [ ! -d "venv_linux" ]; then
+            python3 -m venv venv_linux
+          fi
+          
+          # Activate virtual environment and install dependencies
           source venv_linux/bin/activate
+          pip install --upgrade pip
           pip install -r requirements.txt
-          nohup python start.py &
+          
+          # Check volume paths for data storage
+          echo "Checking volume paths..."
+          python3 check_volume.py || echo "Volume check completed"
+          
+          # Create .env file if it doesn't exist (user must fill it)
+          if [ ! -f ".env" ]; then
+            echo "Creating .env template..."
+            cp .env.example .env
+            echo "⚠️  IMPORTANT: You need to edit .env with your tokens!"
+            echo "   Run: nano /opt/bananabot/.env"
+          fi
+          
+          # Start the bot
+          echo "Starting BananaBot..."
+          nohup python start.py > bananabot.log 2>&1 &
+          
+          # Wait and verify bot started
+          sleep 3
+          if pgrep -f "python.*start.py" > /dev/null; then
+            echo "✅ BananaBot deployed and started successfully!"
+            echo "📋 Check logs: tail -f /opt/bananabot/bananabot.log"
+            echo "📋 Check status: ps aux | grep python"
+          else
+            echo "❌ Bot failed to start, check logs: cat /opt/bananabot/bananabot.log"
+            exit 1
+          fi
