@@ -7,15 +7,49 @@ from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 from pathlib import Path
 
-# Data storage path - mounted volume for persistence
-DATA_ROOT = Path("/mnt/volume-ash-2/bananabot-data")
+# Data storage path - mounted volume for persistence on VPS, local fallback for dev
+DATA_ROOT = None
+
+def get_data_root():
+    """Get data root path with VPS volume fallback."""
+    vps_path = Path("/mnt/volume-ash-2/bananabot-data")
+    local_path = Path("data")
+    
+    # Check if VPS volume exists and is writable
+    try:
+        if vps_path.parent.exists() and os.access(vps_path.parent, os.W_OK):
+            return vps_path
+    except:
+        pass
+    
+    return local_path
 
 def ensure_data_directories():
-    """Ensure all data directories exist on the mounted volume."""
-    (DATA_ROOT / "user_galleries").mkdir(parents=True, exist_ok=True)
-    (DATA_ROOT / "user_stats").mkdir(parents=True, exist_ok=True)
-    (DATA_ROOT / "batch_requests").mkdir(parents=True, exist_ok=True)
-    print(f"Data directories ensured at: {DATA_ROOT}")
+    """Ensure all data directories exist."""
+    global DATA_ROOT
+    if DATA_ROOT is None:
+        DATA_ROOT = get_data_root()
+    
+    try:
+        (DATA_ROOT / "user_galleries").mkdir(parents=True, exist_ok=True)
+        (DATA_ROOT / "user_stats").mkdir(parents=True, exist_ok=True)
+        (DATA_ROOT / "batch_requests").mkdir(parents=True, exist_ok=True)
+        print(f"Data directories ensured at: {DATA_ROOT}")
+    except Exception as e:
+        print(f"Warning: Could not create data directories at {DATA_ROOT}: {e}")
+        # Fallback to local directories
+        DATA_ROOT = Path("data")
+        (DATA_ROOT / "user_galleries").mkdir(parents=True, exist_ok=True)
+        (DATA_ROOT / "user_stats").mkdir(parents=True, exist_ok=True)
+        (DATA_ROOT / "batch_requests").mkdir(parents=True, exist_ok=True)
+        print(f"Using fallback data path: {DATA_ROOT}")
+
+def get_data_path():
+    """Get current data root path."""
+    global DATA_ROOT
+    if DATA_ROOT is None:
+        DATA_ROOT = get_data_root()
+    return DATA_ROOT
 
 class ImageWork(BaseModel):
     """Represents a user's image generation work."""
@@ -61,7 +95,7 @@ class UserGallery(BaseModel):
         """Save gallery to file on mounted volume."""
         ensure_data_directories()
         
-        file_path = DATA_ROOT / "user_galleries" / f"{self.user_id}.json"
+        file_path = get_data_path() / "user_galleries" / f"{self.user_id}.json"
         with open(file_path, 'w') as f:
             json.dump(self.model_dump(), f, default=str, indent=2)
     
@@ -69,7 +103,7 @@ class UserGallery(BaseModel):
     def load(cls, user_id: str) -> 'UserGallery':
         """Load gallery from file on mounted volume."""
         ensure_data_directories()
-        file_path = DATA_ROOT / "user_galleries" / f"{user_id}.json"
+        file_path = get_data_path() / "user_galleries" / f"{user_id}.json"
         
         if file_path.exists():
             with open(file_path, 'r') as f:
@@ -94,7 +128,7 @@ class BatchRequest(BaseModel):
         """Save batch request to file on mounted volume."""
         ensure_data_directories()
         
-        file_path = DATA_ROOT / "batch_requests" / f"{self.batch_id}.json"
+        file_path = get_data_path() / "batch_requests" / f"{self.batch_id}.json"
         with open(file_path, 'w') as f:
             json.dump(self.model_dump(), f, default=str, indent=2)
     
@@ -102,7 +136,7 @@ class BatchRequest(BaseModel):
     def load(cls, batch_id: str) -> Optional['BatchRequest']:
         """Load batch request from file on mounted volume."""
         ensure_data_directories()
-        file_path = DATA_ROOT / "batch_requests" / f"{batch_id}.json"
+        file_path = get_data_path() / "batch_requests" / f"{batch_id}.json"
         
         if file_path.exists():
             with open(file_path, 'r') as f:
@@ -149,7 +183,7 @@ class UserStats(BaseModel):
         """Save stats to file on mounted volume."""
         ensure_data_directories()
         
-        file_path = DATA_ROOT / "user_stats" / f"{self.user_id}.json"
+        file_path = get_data_path() / "user_stats" / f"{self.user_id}.json"
         with open(file_path, 'w') as f:
             json.dump(self.model_dump(), f, default=str, indent=2)
     
@@ -157,7 +191,7 @@ class UserStats(BaseModel):
     def load(cls, user_id: str) -> 'UserStats':
         """Load stats from file on mounted volume."""
         ensure_data_directories()
-        file_path = DATA_ROOT / "user_stats" / f"{user_id}.json"
+        file_path = get_data_path() / "user_stats" / f"{user_id}.json"
         
         if file_path.exists():
             with open(file_path, 'r') as f:

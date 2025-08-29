@@ -56,6 +56,11 @@ user_stats/*
 !user_galleries/.gitkeep
 !user_stats/.gitkeep
 
+# Local data directory (dev fallback)
+data/
+data/*
+!data/.gitkeep
+
 # Temporary files
 temp/
 cache/
