@@ -138,7 +138,7 @@ class BananaBot(commands.Bot):
                     prompt=prompt,
                     image_url=f"work_{str(uuid.uuid4())[:8]}.png",
                     generation_type="create",
-                    cost=0.0025
+                    cost=0.039
                 )
                 gallery.add_work(work)
                 
@@ -218,7 +218,7 @@ class BananaBot(commands.Bot):
                     prompt=prompt,
                     image_url=f"work_{str(uuid.uuid4())[:8]}.png",
                     generation_type="edit",
-                    cost=0.0025
+                    cost=0.039
                 )
                 gallery.add_work(work)
                 
@@ -294,7 +294,7 @@ class BananaBot(commands.Bot):
                     prompt=f"{prompt} (from URL)",
                     image_url=f"work_{str(uuid.uuid4())[:8]}.png",
                     generation_type="edit",
-                    cost=0.0025
+                    cost=0.039
                 )
                 gallery.add_work(work)
                 

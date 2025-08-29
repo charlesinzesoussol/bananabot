@@ -35,9 +35,9 @@ class GeminiBatchProcessor:
         self.max_batch_size = 100  # Gemini API limit
         self.batch_timeout = 300  # 5 minutes max wait
         
-        # Cost settings
-        self.standard_cost = 0.0025  # $0.0025 per image
-        self.batch_cost = 0.00125   # 50% discount
+        # Cost settings (updated to actual Gemini pricing)
+        self.standard_cost = 0.039  # $0.039 per image (actual Gemini pricing)
+        self.batch_cost = 0.0195   # 50% discount for batch processing
         
         logger.info("Gemini Batch Processor initialized")
     

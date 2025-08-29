@@ -36,20 +36,54 @@ jobs:
         username: ${{ secrets.VPS_USER }}
         key: ${{ secrets.VPS_SSH_KEY }}
         port: 22
+        debug: true
         script: |
-          cd /opt/bananabot || exit 1
+          echo "🍌 Starting BananaBot deployment..."
+          whoami
+          pwd
+          
+          # Create directory if it doesn't exist
+          echo "Creating bot directory..."
+          mkdir -p /opt/bananabot
+          cd /opt/bananabot
+          
+          # Clone repo if it doesn't exist
+          if [ ! -d ".git" ]; then
+            echo "Cloning repository..."
+            git clone https://github.com/charlesinzesoussol/bananabot.git .
+          else
+            echo "Repository already exists, pulling updates..."
+          fi
           
           # Stop the bot if running
+          echo "Stopping existing bot..."
           pkill -f "python.*slash_bot.py" || true
+          pkill -f "python.*start.py" || true
           
           # Pull latest changes
-          git pull origin main
+          echo "Pulling latest changes..."
+          git pull origin main || echo "Pull failed, continuing..."
+          
+          # Create virtual environment if it doesn't exist
+          if [ ! -d "venv_linux" ]; then
+            echo "Creating virtual environment..."
+            python3 -m venv venv_linux
+          fi
           
           # Update dependencies
+          echo "Installing dependencies..."
           source venv_linux/bin/activate
+          pip install --upgrade pip
           pip install -r requirements.txt
           
-          # Start the bot in background
-          nohup python start.py > bananabot.log 2>&1 &
+          # Check volume paths
+          echo "Checking volume paths..."
+          python3 check_volume.py || true
           
-          echo "Bot deployed and started"
+          # Start the bot in background
+          echo "Starting bot..."
+          nohup python start.py > bananabot.log 2>&1 &
+          sleep 2
+          
+          echo "✅ Bot deployed and started successfully!"
+          echo "Check logs with: tail -f /opt/bananabot/bananabot.log"

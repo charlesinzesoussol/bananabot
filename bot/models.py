@@ -70,7 +70,7 @@ class ImageWork(BaseModel):
     generation_type: str = Field(default="create", description="create, edit, batch")
     parent_id: Optional[str] = Field(None, description="ID of original work if this is a modification")
     batch_id: Optional[str] = Field(None, description="Batch ID if generated in bulk")
-    cost: float = Field(default=0.0025, description="API cost for this generation")
+    cost: float = Field(default=0.039, description="API cost for this generation")
     
 class UserGallery(BaseModel):
     """User's image gallery and history."""
