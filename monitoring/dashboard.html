@@ -26,16 +26,35 @@
                 <div class="value status" id="status">Loading...</div>
             </div>
             <div class="card metric">
+                <h3>Guild Count</h3>
+                <div class="value" id="guilds">Loading...</div>
+            </div>
+            <div class="card metric">
                 <h3>Memory Usage</h3>
                 <div class="value" id="memory">Loading...</div>
             </div>
             <div class="card metric">
-                <h3>Disk Usage</h3>
-                <div class="value" id="disk">Loading...</div>
+                <h3>Total Downloads</h3>
+                <div class="value" id="downloads">Loading...</div>
+            </div>
+        </div>
+
+        <div class="grid">
+            <div class="card metric">
+                <h3>Active Users (24h)</h3>
+                <div class="value" id="activeUsers">Loading...</div>
             </div>
             <div class="card metric">
                 <h3>Images Generated (24h)</h3>
                 <div class="value" id="generations">Loading...</div>
+            </div>
+            <div class="card metric">
+                <h3>Cost Today</h3>
+                <div class="value" id="cost">Loading...</div>
+            </div>
+            <div class="card metric">
+                <h3>Disk Usage</h3>
+                <div class="value" id="disk">Loading...</div>
             </div>
         </div>
 
@@ -52,43 +71,106 @@
     </div>
 
     <script>
-        // Load latest metrics and create charts
+        // Load latest metrics from GitHub repository
         async function loadMetrics() {
             try {
-                // In a real implementation, load from your metrics JSON files
-                // For now, showing sample data structure
-                const sampleData = {
-                    status: 'active',
-                    memory: '45.2%',
-                    disk: '23%', 
-                    generations: '127'
-                };
+                // Load real metrics from the monitoring directory
+                const response = await fetch('https://api.github.com/repos/charlesinzesoussol/bananabot/contents/monitoring');
+                const files = await response.json();
                 
-                // Update metrics display
-                document.getElementById('status').textContent = sampleData.status;
-                document.getElementById('status').className = `value status ${sampleData.status === 'active' ? 'online' : 'offline'}`;
-                document.getElementById('memory').textContent = sampleData.memory;
-                document.getElementById('disk').textContent = sampleData.disk;
-                document.getElementById('generations').textContent = sampleData.generations;
+                // Get the latest metrics file
+                const latestFile = files
+                    .filter(f => f.name.endsWith('.json') && f.name !== 'dashboard.html')
+                    .sort((a, b) => b.name.localeCompare(a.name))[0];
                 
-                // Create charts with sample data
-                createCharts();
+                if (latestFile) {
+                    const metricsResponse = await fetch(latestFile.download_url);
+                    const metrics = await metricsResponse.json();
+                    
+                    // Update metrics display with real data
+                    document.getElementById('status').textContent = metrics.bot_status;
+                    document.getElementById('status').className = `value status ${metrics.bot_status === 'active' ? 'online' : 'offline'}`;
+                    document.getElementById('guilds').textContent = metrics.guild_count;
+                    document.getElementById('memory').textContent = metrics.memory_usage + '%';
+                    document.getElementById('downloads').textContent = metrics.total_downloads;
+                    document.getElementById('activeUsers').textContent = metrics.active_users_24h;
+                    document.getElementById('generations').textContent = metrics.recent_activity_24h;
+                    document.getElementById('cost').textContent = '$' + parseFloat(metrics.total_cost_today).toFixed(4);
+                    document.getElementById('disk').textContent = metrics.disk_usage + '%';
+                    
+                    // Create charts with historical data
+                    await createChartsWithHistoricalData(files);
+                } else {
+                    // Fallback to placeholder data
+                    showPlaceholderData();
+                }
                 
             } catch (error) {
                 console.error('Failed to load metrics:', error);
+                showPlaceholderData();
             }
         }
         
-        function createCharts() {
+        function showPlaceholderData() {
+            document.getElementById('status').textContent = 'Loading...';
+            document.getElementById('guilds').textContent = 'N/A';
+            document.getElementById('memory').textContent = 'N/A';
+            document.getElementById('downloads').textContent = 'N/A';
+            document.getElementById('activeUsers').textContent = 'N/A';
+            document.getElementById('generations').textContent = 'N/A';
+            document.getElementById('cost').textContent = 'N/A';
+            document.getElementById('disk').textContent = 'N/A';
+            createCharts(); // Create with sample data
+        }
+        
+        async function createChartsWithHistoricalData(files) {
+            try {
+                // Get last 12 data points for charts
+                const dataFiles = files
+                    .filter(f => f.name.endsWith('.json'))
+                    .sort((a, b) => b.name.localeCompare(a.name))
+                    .slice(0, 12);
+                
+                const historicalData = [];
+                for (const file of dataFiles.reverse()) {
+                    try {
+                        const response = await fetch(file.download_url);
+                        const data = await response.json();
+                        historicalData.push({
+                            timestamp: data.timestamp,
+                            memory: parseFloat(data.memory_usage) || 0,
+                            activity: parseInt(data.recent_activity_24h) || 0
+                        });
+                    } catch (e) {
+                        console.warn('Failed to load file:', file.name);
+                    }
+                }
+                
+                if (historicalData.length > 0) {
+                    createChartsWithData(historicalData);
+                } else {
+                    createCharts(); // Fallback to sample data
+                }
+            } catch (error) {
+                console.error('Failed to create historical charts:', error);
+                createCharts(); // Fallback to sample data
+            }
+        }
+        
+        function createChartsWithData(historicalData) {
+            const labels = historicalData.map(d => new Date(d.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}));
+            const memoryData = historicalData.map(d => d.memory);
+            const activityData = historicalData.map(d => d.activity);
+            
             // Memory usage chart
             const memCtx = document.getElementById('memoryChart').getContext('2d');
             new Chart(memCtx, {
                 type: 'line',
                 data: {
-                    labels: ['12:00', '12:15', '12:30', '12:45', '13:00'],
+                    labels: labels,
                     datasets: [{
                         label: 'Memory %',
-                        data: [42, 45, 43, 47, 45],
+                        data: memoryData,
                         borderColor: '#4CAF50',
                         backgroundColor: 'rgba(76, 175, 80, 0.1)',
                         tension: 0.4
@@ -111,10 +193,10 @@
             new Chart(actCtx, {
                 type: 'bar',
                 data: {
-                    labels: ['12:00', '12:15', '12:30', '12:45', '13:00'],
+                    labels: labels,
                     datasets: [{
-                        label: 'Images Generated',
-                        data: [5, 8, 3, 12, 7],
+                        label: 'Images Generated (24h)',
+                        data: activityData,
                         backgroundColor: '#FF9800',
                         borderColor: '#F57F17',
                         borderWidth: 1
@@ -131,6 +213,17 @@
                     }
                 }
             });
+        }
+        
+        function createCharts() {
+            // Fallback sample data charts
+            createChartsWithData([
+                { timestamp: new Date(Date.now() - 4*15*60000).toISOString(), memory: 42, activity: 5 },
+                { timestamp: new Date(Date.now() - 3*15*60000).toISOString(), memory: 45, activity: 8 },
+                { timestamp: new Date(Date.now() - 2*15*60000).toISOString(), memory: 43, activity: 3 },
+                { timestamp: new Date(Date.now() - 1*15*60000).toISOString(), memory: 47, activity: 12 },
+                { timestamp: new Date().toISOString(), memory: 45, activity: 7 }
+            ]);
         }
         
         // Load data when page loads
