@@ -1,5 +1,77 @@
-venv
-venv_linux
-__pycache__
-.ruff_cache
-.pytest_cache
+# Virtual environments
+venv/
+venv_linux/
+env/
+ENV/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.ruff_cache/
+.pytest_cache/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Environment variables - CRITICAL: Never commit these
+.env
+.env.*
+*.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs - Never commit logs
+*.log
+logs/
+bananabot.log
+
+# User data - CRITICAL: Never commit user data
+user_galleries/*.json
+user_stats/*.json
+user_galleries/*
+user_stats/*
+!user_galleries/.gitkeep
+!user_stats/.gitkeep
+
+# Local data directory (dev fallback)
+data/
+data/*
+!data/.gitkeep
+
+# Temporary files
+temp/
+cache/
+batch_temp/
+*.batch
+*.tmp
+
+# Testing
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+.hypothesis/

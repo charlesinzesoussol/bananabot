@@ -1,0 +1,264 @@
+name: Deploy BananaBot to VPS
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'deploy'
+        type: choice
+        options:
+          - deploy
+          - start
+          - stop
+          - restart
+          - status
+          - logs
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+concurrency:
+  group: vps-deployment
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: ${{ github.event.inputs.action || 'deploy' }} BananaBot on VPS
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'production' }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+          
+      - name: Test SSH connection
+        run: |
+          ssh -o ConnectTimeout=10 root@${{ secrets.VPS_HOST }} "echo 'SSH connection successful'"
+          
+      - name: Deploy application
+        if: github.event.inputs.action == 'deploy' || github.event.inputs.action == null
+        run: |
+          echo "🍌 Deploying BananaBot to VPS..."
+          ssh root@${{ secrets.VPS_HOST }} << 'EOF'
+            set -e
+            
+            # Create application directory
+            mkdir -p /opt/bananabot
+            cd /opt/bananabot
+            
+            # Stop existing processes
+            systemctl stop bananabot || true
+            timeout 10s pkill -f "python.*start.py" || true
+            timeout 10s pkill -f "python.*slash_bot.py" || true
+            
+            # Clone or update repository
+            if [ -d ".git" ]; then
+              echo "📥 Updating existing repository..."
+              git fetch origin
+              git reset --hard origin/main
+              git clean -fd
+            else
+              echo "📥 Cloning repository..."
+              cd /opt
+              rm -rf bananabot
+              git clone https://github.com/charlesinzesoussol/bananabot.git
+              cd bananabot
+            fi
+            
+            # Setup Python environment
+            echo "🐍 Setting up Python environment..."
+            apt-get update -qq
+            apt-get install -y python3 python3-venv python3-pip systemd curl wget git
+            
+            # Create virtual environment
+            echo "Creating virtual environment..."
+            rm -rf venv_linux  # Remove if exists
+            python3 -m venv venv_linux
+            
+            # Activate and install dependencies
+            echo "Activating virtual environment..."
+            source venv_linux/bin/activate
+            echo "Virtual environment activated successfully"
+            
+            # Install dependencies
+            echo "Installing dependencies..."
+            pip install --upgrade pip
+            pip install -r requirements.txt
+            echo "Dependencies installed successfully"
+            
+            # Create data directories
+            mkdir -p /opt/bananabot/data
+            mkdir -p /opt/bananabot/logs
+            
+            # Set permissions
+            chmod +x start.py
+            chmod +x check_volume.py
+            
+            echo "✅ Application deployed successfully"
+          EOF
+          
+      - name: Configure environment variables
+        if: github.event.inputs.action == 'deploy' || github.event.inputs.action == null
+        run: |
+          echo "⚙️ Configuring environment variables..."
+          ssh root@${{ secrets.VPS_HOST }} << 'EOF'
+            cd /opt/bananabot
+            
+            # Create environment file
+            cat > .env << 'ENVEOF'
+          DISCORD_TOKEN=${{ secrets.DISCORD_TOKEN }}
+          GUILD_ID=${{ secrets.GUILD_ID }}
+          GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+          LOG_LEVEL=INFO
+          MAX_REQUESTS_PER_HOUR=3
+          ENABLE_BATCH_PROCESSING=false
+          BATCH_SIZE=10
+          BATCH_TIMEOUT=60
+          ENABLE_CONTENT_FILTER=true
+          ENVEOF
+            
+            # Set secure permissions on env file
+            chmod 600 .env
+            
+            # Check volume paths (ensure we're in the right directory)
+            cd /opt/bananabot
+            python3 check_volume.py || echo "Volume check completed"
+            
+            echo "✅ Environment configured"
+          EOF
+          
+      - name: Setup systemd service
+        if: github.event.inputs.action == 'deploy' || github.event.inputs.action == null
+        run: |
+          echo "🔧 Setting up systemd service..."
+          ssh root@${{ secrets.VPS_HOST }} << 'EOF'
+            # Create systemd service file
+            cat > /etc/systemd/system/bananabot.service << 'SERVICEEOF'
+          [Unit]
+          Description=BananaBot Discord AI Image Generator
+          After=network.target
+          Wants=network.target
+          
+          [Service]
+          Type=simple
+          User=root
+          WorkingDirectory=/opt/bananabot
+          Environment=PATH=/opt/bananabot/venv_linux/bin
+          ExecStart=/opt/bananabot/venv_linux/bin/python /opt/bananabot/start.py
+          Restart=always
+          RestartSec=10
+          StandardOutput=journal
+          StandardError=journal
+          SyslogIdentifier=bananabot
+          
+          # Resource limits
+          MemoryMax=1G
+          CPUQuota=50%
+          
+          [Install]
+          WantedBy=multi-user.target
+          SERVICEEOF
+            
+            # Reload systemd and enable service
+            systemctl daemon-reload
+            systemctl enable bananabot
+            
+            echo "✅ Systemd service configured"
+          EOF
+          
+      - name: Start bot service
+        if: github.event.inputs.action == 'deploy' || github.event.inputs.action == 'start' || github.event.inputs.action == null
+        run: |
+          echo "▶️ Starting BananaBot service..."
+          ssh root@${{ secrets.VPS_HOST }} << 'EOF'
+            systemctl start bananabot
+            sleep 5
+            systemctl status bananabot --no-pager
+            echo "✅ Bot service started"
+          EOF
+          
+      - name: Stop bot service
+        if: github.event.inputs.action == 'stop'
+        run: |
+          echo "⏹️ Stopping BananaBot service..."
+          ssh root@${{ secrets.VPS_HOST }} << 'EOF'
+            systemctl stop bananabot
+            echo "✅ Bot service stopped"
+          EOF
+          
+      - name: Restart bot service
+        if: github.event.inputs.action == 'restart'
+        run: |
+          echo "🔄 Restarting BananaBot service..."
+          ssh root@${{ secrets.VPS_HOST }} << 'EOF'
+            systemctl restart bananabot
+            sleep 5
+            systemctl status bananabot --no-pager
+            echo "✅ Bot service restarted"
+          EOF
+          
+      - name: Check service status
+        if: github.event.inputs.action == 'status'
+        run: |
+          echo "📊 Checking BananaBot service status..."
+          ssh root@${{ secrets.VPS_HOST }} << 'EOF'
+            echo "=== Service Status ==="
+            systemctl status bananabot --no-pager
+            echo ""
+            echo "=== System Resources ==="
+            df -h /opt/bananabot
+            echo ""
+            echo "=== Memory Usage ==="
+            ps aux | grep "python.*start.py" | grep -v grep || echo "Bot not running"
+            echo ""
+            echo "=== Volume Storage ==="
+            python3 /opt/bananabot/check_volume.py || true
+            echo ""
+            echo "=== Recent Activity ==="
+            systemctl is-active bananabot
+          EOF
+          
+      - name: Show bot logs
+        if: github.event.inputs.action == 'logs'
+        run: |
+          echo "📋 Showing BananaBot logs..."
+          ssh root@${{ secrets.VPS_HOST }} << 'EOF'
+            echo "=== Last 50 systemd log entries ==="
+            journalctl -u bananabot --no-pager -n 50
+            echo ""
+            echo "=== Application log file ==="
+            if [ -f /opt/bananabot/bananabot.log ]; then
+              tail -30 /opt/bananabot/bananabot.log
+            else
+              echo "No application log file found"
+            fi
+          EOF
+          
+      - name: Deployment summary
+        if: always()
+        run: |
+          echo "📝 Deployment Summary:"
+          echo "- Server: ${{ secrets.VPS_HOST }} (Hetzner VPS)"
+          echo "- Action: ${{ github.event.inputs.action || 'deploy' }}"
+          echo "- Environment: ${{ github.event.inputs.environment || 'production' }}"
+          echo "- Bot: BananaBot Discord AI Image Generator"
+          echo "- Storage: Volume-ash-2 (ID: 103242903)"
+          echo "- Cost per image: $0.039 (Gemini 2.5 Flash)"
+          echo "- Timestamp: $(date -u)"
+          echo "- Commit: ${{ github.sha }}"
