@@ -4,7 +4,6 @@ import logging
 import traceback
 from typing import Optional
 import discord
-from discord import app_commands
 
 logger = logging.getLogger(__name__)
 
@@ -91,13 +90,6 @@ class ErrorHandler:
         # Determine user message
         if isinstance(error, BananaBotError):
             user_message = error.user_message
-        elif isinstance(error, app_commands.CommandInvokeError):
-            # Unwrap the original error
-            original_error = error.original
-            if isinstance(original_error, BananaBotError):
-                user_message = original_error.user_message
-            else:
-                user_message = "An unexpected error occurred. Please try again."
         else:
             user_message = "An unexpected error occurred. Please try again."
         
@@ -129,34 +121,6 @@ class ErrorHandler:
         logger.error(f"Error{context_str}: {error}")
         logger.error(traceback.format_exc())
     
-    @staticmethod
-    async def handle_tree_error(interaction: discord.Interaction, error: app_commands.AppCommandError) -> None:
-        """
-        Global error handler for command tree.
-        
-        Args:
-            interaction: Discord interaction
-            error: App command error
-        """
-        logger.error(f"Tree error: {error}")
-        
-        if isinstance(error, app_commands.CommandOnCooldown):
-            await interaction.response.send_message(
-                f"Command is on cooldown. Try again in {error.retry_after:.1f} seconds.",
-                ephemeral=True
-            )
-        elif isinstance(error, app_commands.MissingPermissions):
-            await interaction.response.send_message(
-                "You don't have permission to use this command.",
-                ephemeral=True
-            )
-        elif isinstance(error, app_commands.BotMissingPermissions):
-            await interaction.response.send_message(
-                "I don't have the required permissions to execute this command.",
-                ephemeral=True
-            )
-        else:
-            await ErrorHandler.handle_command_error(interaction, error)
 
 # Global error handler instance
 error_handler = ErrorHandler()

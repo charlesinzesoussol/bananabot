@@ -4,7 +4,6 @@ import asyncio
 import logging
 import discord
 from discord.ext import commands
-from discord import app_commands  # Still needed for the old error handler import
 from typing import Optional, List, Tuple
 import io
 import uuid
@@ -150,7 +149,7 @@ class BananaBot(commands.Bot):
         async def _handle_help(ctx: commands.Context):
             """Handle help command."""
             embed = discord.Embed(
-                title="🍌 BananaBot Commands v1.4",
+                title="🍌 BananaBot Commands v1.5",
                 description="Your friendly AI image creation assistant",
                 color=0xFFD700
             )
@@ -173,7 +172,7 @@ class BananaBot(commands.Bot):
                 inline=False
             )
             
-            embed.set_footer(text="Made with 🍌 | v1.4 • Slash commands cleared | Powered by Google Gemini")
+            embed.set_footer(text="Made with 🍌 | v1.5 • All slash commands purged | Powered by Google Gemini")
             
             await ctx.send(embed=embed)
         
@@ -205,7 +204,7 @@ class BananaBot(commands.Bot):
         @self.command(name='test', aliases=['ping'])
         async def test_command(ctx: commands.Context):
             """Test if the bot is responding to commands."""
-            await ctx.send("🍌 Bot is working! Commands are active v1.4 - Slash commands cleared!")
+            await ctx.send("🍌 Bot is working! v1.5 - All slash command files deleted!")
     
     async def setup_hook(self) -> None:
         """
@@ -214,11 +213,6 @@ class BananaBot(commands.Bot):
         logger.info("Running setup hook...")
         
         try:
-            # CRITICAL: Clear any old slash commands
-            self.tree.clear()
-            await self.tree.sync()
-            logger.info("Cleared old slash commands from Discord")
-            
             # Initialize services
             await self._initialize_services()
             
@@ -280,6 +274,13 @@ class BananaBot(commands.Bot):
             logger.warning("Bot user is None after ready event")
         logger.info(f"Connected to {len(self.guilds)} guilds")
         
+        # CRITICAL: Clear any old slash commands by syncing empty tree
+        try:
+            await self.tree.sync()  # Sync empty tree to clear all slash commands
+            logger.info("✅ Cleared all slash commands from Discord by syncing empty tree")
+        except Exception as e:
+            logger.error(f"Failed to clear slash commands: {e}")
+        
         # Set bot status
         await self.change_presence(
             activity=discord.Activity(
@@ -298,13 +299,6 @@ class BananaBot(commands.Bot):
         logger.error(f"Error in {event_method}")
         error_handler.log_error(Exception(f"Bot error in {event_method}"))
     
-    async def on_app_command_error(
-        self,
-        interaction: discord.Interaction,
-        error: app_commands.AppCommandError
-    ) -> None:
-        """Handle application command errors."""
-        await error_handler.handle_tree_error(interaction, error)
     
     async def close(self) -> None:
         """Clean up resources when bot is shutting down."""
