@@ -1,26 +1,97 @@
-name: Deploy to VPS
+name: Deploy BananaBot to VPS
 
 on:
   push:
     branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
     steps:
-    - name: Deploy
-      uses: appleboy/ssh-action@v0.1.5
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Deploy BananaBot to VPS
+      uses: appleboy/ssh-action@v1
       with:
         host: ${{ secrets.VPS_HOST }}
         username: ${{ secrets.VPS_USER }}
         key: ${{ secrets.VPS_SSH_KEY }}
+        port: 22
+        timeout: 60s
+        command_timeout: 20m
+        debug: true
         script: |
-          mkdir -p /opt/bananabot && cd /opt/bananabot
-          pkill python || true
-          git clone https://github.com/charlesinzesoussol/bananabot.git . || git pull
-          python3 -m venv venv_linux
-          source venv_linux/bin/activate && pip install -r requirements.txt
-          echo "DISCORD_TOKEN=${{ secrets.DISCORD_TOKEN }}" > .env
-          echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> .env  
-          echo "LOG_LEVEL=INFO" >> .env
-          nohup python start.py &
+          echo "🍌 Starting BananaBot deployment..."
+          
+          # Setup bot directory  
+          mkdir -p /opt/bananabot
+          cd /opt/bananabot
+          
+          # Stop existing bot processes
+          echo "Stopping existing bot..."
+          pkill -f "python.*start.py" || true
+          pkill -f "python.*slash_bot.py" || true
+          sleep 2
+          
+          # Update repository
+          echo "Updating code..."
+          if [ ! -d ".git" ]; then
+            echo "Cloning repository..."
+            git clone https://github.com/charlesinzesoussol/bananabot.git .
+          else
+            echo "Pulling latest changes..."
+            git fetch origin
+            git reset --hard origin/main
+            git clean -fd
+          fi
+          
+          # Setup Python virtual environment
+          echo "Setting up Python environment..."
+          if [ ! -d "venv_linux" ]; then
+            echo "Creating virtual environment..."
+            python3 -m venv venv_linux
+          fi
+          
+          # Activate virtual environment and install dependencies
+          echo "Installing dependencies..."
+          source venv_linux/bin/activate
+          pip install --upgrade pip
+          pip install --no-cache-dir -r requirements.txt
+          
+          # Create .env file from GitHub secrets
+          echo "Creating .env file from GitHub secrets..."
+          cat > .env << EOF
+          DISCORD_TOKEN=${{ secrets.DISCORD_TOKEN }}
+          GUILD_ID=${{ secrets.GUILD_ID }}
+          GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+          LOG_LEVEL=INFO
+          MAX_REQUESTS_PER_HOUR=10
+          ENABLE_BATCH_PROCESSING=false
+          BATCH_SIZE=10
+          BATCH_TIMEOUT=60
+          ENABLE_CONTENT_FILTER=true
+          EOF
+          
+          # Check volume paths for data storage
+          echo "Checking volume paths..."
+          python3 check_volume.py || echo "Volume check completed"
+          
+          # Start the bot
+          echo "Starting BananaBot..."
+          nohup python start.py > bananabot.log 2>&1 &
+          sleep 3
+          
+          # Verify bot started
+          if pgrep -f "python.*start.py" > /dev/null; then
+            echo "✅ BananaBot deployed and started successfully!"
+            echo "📋 Check logs: tail -f /opt/bananabot/bananabot.log"
+            echo "📋 Check status: ps aux | grep python"
+          else
+            echo "❌ Bot failed to start, check logs:"
+            cat bananabot.log
+            exit 1
+          fi
