@@ -464,6 +464,154 @@ class BananaBot(commands.Bot):
                 )
                 await interaction.followup.send(embed=embed)
 
+        @self.tree.command(name="fuse-images", description="Fuse/combine multiple images into one using AI")
+        @app_commands.describe(
+            prompt="Describe how to combine/fuse multiple images",
+            image1="First image to fuse",
+            image2="Second image to fuse", 
+            image3="Third image (optional)",
+            image4="Fourth image (optional)",
+            image5="Fifth image (optional)"
+        )
+        async def fuse_images(
+            interaction: discord.Interaction, 
+            prompt: str,
+            image1: discord.Attachment,
+            image2: discord.Attachment,
+            image3: discord.Attachment = None,
+            image4: discord.Attachment = None,
+            image5: discord.Attachment = None
+        ):
+            """Fuse/combine multiple images into one using AI."""
+            await interaction.response.defer()
+            
+            user_id = str(interaction.user.id)
+            
+            # Check rate limit with detailed feedback
+            if not await self.rate_limiter.check_user(user_id):
+                status = await self.rate_limiter.get_user_status(user_id)
+                reset_time = status.get('reset_time')
+                requests_used = status.get('requests_used', 0)
+                
+                embed = discord.Embed(
+                    title="⏰ Rate Limited",
+                    description=f"You've used {requests_used}/{config.MAX_REQUESTS_PER_HOUR} requests this hour.",
+                    color=0xE02B2B
+                )
+                if reset_time:
+                    minutes = int(reset_time / 60)
+                    seconds = int(reset_time % 60)
+                    embed.add_field(
+                        name="Reset Time", 
+                        value=f"⏱️ {minutes}m {seconds}s", 
+                        inline=False
+                    )
+                embed.add_field(
+                    name="💡 Tip",
+                    value="Image fusion counts as 1 request regardless of image count",
+                    inline=False
+                )
+                
+                await interaction.followup.send(embed=embed)
+                return
+            
+            # Collect all provided images
+            images = [image1, image2]
+            if image3: images.append(image3)
+            if image4: images.append(image4) 
+            if image5: images.append(image5)
+            
+            # Validate image attachments
+            for i, img in enumerate(images):
+                if not img.content_type or not img.content_type.startswith('image/'):
+                    embed = discord.Embed(
+                        title="❌ Invalid File",
+                        description=f"Image {i+1} must be an image file",
+                        color=0xE02B2B
+                    )
+                    await interaction.followup.send(embed=embed)
+                    return
+                
+                if img.size > config.MAX_IMAGE_SIZE_MB * 1024 * 1024:
+                    embed = discord.Embed(
+                        title="📁 File Too Large",
+                        description=f"Image {i+1} must be under {config.MAX_IMAGE_SIZE_MB}MB",
+                        color=0xE02B2B
+                    )
+                    await interaction.followup.send(embed=embed)
+                    return
+            
+            try:
+                # Download all images
+                image_data_list = []
+                for img in images:
+                    image_data = await img.read()
+                    image_data_list.append(image_data)
+                
+                # Show processing message
+                embed = discord.Embed(
+                    title="🔄 Fusing Images...",
+                    description=f"Combining {len(images)} images with Gemini 2.5 Flash\nThis may take a few moments...",
+                    color=0xFFD700
+                )
+                processing_msg = await interaction.followup.send(embed=embed)
+                
+                # Fuse images using Gemini
+                result_image_data = await self.gemini_client.fuse_multiple_images(prompt, image_data_list)
+                
+                # Save result and create work record
+                work_id = str(uuid.uuid4())[:8]
+                work = ImageWork(
+                    id=work_id,
+                    user_id=user_id,
+                    prompt=f"FUSE: {prompt}",
+                    image_url="",  # Will be updated after save
+                    generation_type="fuse",
+                    cost=config.STANDARD_IMAGE_COST  # Same cost as regular generation
+                )
+                
+                # Save to user gallery
+                gallery = UserGallery.load(user_id)
+                gallery.add_work(work)
+                
+                # Update user stats
+                stats = UserStats.load(user_id)
+                stats.update_stats(work)
+                
+                # Delete processing message and send result
+                await processing_msg.delete()
+                
+                # Create result embed
+                embed = discord.Embed(
+                    title="🎨 Images Fused Successfully!",
+                    description=f"**Prompt:** {prompt}\n**Images combined:** {len(images)}",
+                    color=0x00FF00
+                )
+                embed.add_field(
+                    name="💰 Cost", 
+                    value=f"${config.STANDARD_IMAGE_COST:.3f}", 
+                    inline=True
+                )
+                embed.add_field(
+                    name="🆔 Work ID", 
+                    value=work_id, 
+                    inline=True
+                )
+                embed.set_footer(text=f"User: {interaction.user.display_name} • BananaBot v1.2.0")
+                
+                # Send result with fused image
+                file = discord.File(io.BytesIO(result_image_data), filename=f"fused_{work_id}.png")
+                await interaction.followup.send(embed=embed, file=file)
+                
+            except Exception as e:
+                logger.error(f"Image fusion error: {e}")
+                embed = discord.Embed(
+                    title="❌ Fusion Failed",
+                    description=f"Failed to fuse images: {str(e)[:100]}...",
+                    color=0xE02B2B
+                )
+                await interaction.followup.send(embed=embed)
+
         @self.tree.command(name="gallery", description="View your recent image creations")
         @app_commands.describe(limit="Number of recent works to show (1-10)")
         async def gallery(interaction: discord.Interaction, limit: int = 5):
@@ -512,7 +660,7 @@ class BananaBot(commands.Bot):
         async def help_command(interaction: discord.Interaction):
             """Display help information."""
             embed = discord.Embed(
-                title="🍌 BananaBot v1.1.1",
+                title="🍌 BananaBot v1.3.0",
                 description="AI Image Generation Bot with Batch Processing",
                 color=0xFFD700
             )
@@ -523,6 +671,7 @@ class BananaBot(commands.Bot):
                     "`/generate <prompt>` - Generate an AI image from text\n"
                     "`/generate-with-image <prompt> <image>` - Edit an attached image\n"
                     "`/generate-link <prompt> <url>` - Edit an image from URL\n"
+                    "`/fuse-images <prompt> <img1> <img2> [img3-5]` - Combine multiple images\n"
                     "`/gallery [limit]` - View your image gallery\n"
                     "`/help` - Show this help message"
                 ),
@@ -535,12 +684,13 @@ class BananaBot(commands.Bot):
                     "• Use `/generate` for creating new images from text\n"
                     "• Use `/generate-with-image` to modify your own images\n"
                     "• Use `/generate-link` to edit images from the web\n"
+                    "• Use `/fuse-images` to combine 2-5 images creatively\n"
                     "• All your creations are saved in your gallery"
                 ),
                 inline=False
             )
             
-            embed.set_footer(text="BananaBot v1.1.1 • Cost Analysis & Industry Standards")
+            embed.set_footer(text="BananaBot v1.3.0 • Multi-Image Fusion & AI Generation")
             await interaction.response.send_message(embed=embed)
 
     async def on_ready(self) -> None:

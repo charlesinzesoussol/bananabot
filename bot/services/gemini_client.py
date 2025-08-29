@@ -86,6 +86,81 @@ class GeminiImageClient:
         # Should never reach here, but mypy requires this
         raise GeminiAPIError(f"Failed to generate image after {retry_count} attempts")
     
+    async def fuse_multiple_images(self, prompt: str, image_data_list: list[bytes], retry_count: int = 3) -> bytes:
+        """
+        Fuse/combine multiple images based on a text prompt.
+        
+        Args:
+            prompt: Text description of how to combine/fuse the images
+            image_data_list: List of image data as bytes (2-10 images recommended)
+            retry_count: Number of retry attempts on failure
+            
+        Returns:
+            Fused image data as bytes in PNG format
+            
+        Raises:
+            GeminiAPIError: If image fusion fails after retries
+            ContentFilterError: If prompt is blocked by content filter
+        """
+        logger.info(f"Fusing {len(image_data_list)} images with prompt: '{prompt[:50]}...'")
+        
+        if len(image_data_list) < 2:
+            raise GeminiAPIError("At least 2 images required for fusion")
+        if len(image_data_list) > 10:
+            raise GeminiAPIError("Maximum 10 images allowed for fusion")
+        
+        # PATTERN: Exponential backoff for retries
+        for attempt in range(retry_count):
+            try:
+                # Convert all images to PIL format
+                pil_images = []
+                for img_data in image_data_list:
+                    try:
+                        pil_image = Image.open(io.BytesIO(img_data))
+                        # Convert to RGB if necessary
+                        if pil_image.mode != 'RGB':
+                            pil_image = pil_image.convert('RGB')
+                        pil_images.append(pil_image)
+                    except Exception as e:
+                        raise GeminiAPIError(f"Failed to process image: {e}")
+                
+                # Create content list with prompt and all images
+                content = [prompt] + pil_images
+                
+                # Generate fused image
+                response = await asyncio.to_thread(
+                    self.client.generate_content,
+                    content
+                )
+                
+                # Check for content filtering
+                if response.prompt_feedback and response.prompt_feedback.block_reason:
+                    raise ContentFilterError(f"Content filtered: {response.prompt_feedback.block_reason}")
+                
+                # Extract and return image data
+                if response.candidates and len(response.candidates) > 0:
+                    candidate = response.candidates[0]
+                    
+                    if hasattr(candidate, 'content') and candidate.content.parts:
+                        for part in candidate.content.parts:
+                            if hasattr(part, 'inline_data'):
+                                image_data = part.inline_data.data
+                                logger.info("Successfully fused multiple images")
+                                return image_data
+                
+                raise GeminiAPIError("No image data in response")
+                
+            except ContentFilterError:
+                raise  # Don't retry content filter errors
+            except Exception as e:
+                logger.warning(f"Image fusion attempt {attempt + 1} failed: {e}")
+                if attempt < retry_count - 1:
+                    wait_time = 2 ** attempt  # Exponential backoff
+                    await asyncio.sleep(wait_time)
+                    continue
+                else:
+                    raise GeminiAPIError(f"Failed to fuse images after {retry_count} attempts: {e}")
+    
     async def edit_image(self, prompt: str, image_data: bytes, retry_count: int = 3) -> bytes:
         """
         Edit an existing image based on a text prompt.
