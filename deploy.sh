@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# BananaBot VPS Deployment Script
-# Run this on your VPS at 178.156.195.131
+# BananaBot VPS Quick Deployment Script
+# Run this directly on your VPS: wget -O - https://raw.githubusercontent.com/charlesinzesoussol/bananabot/main/deploy.sh | sudo bash
 
 set -e
 
@@ -9,14 +9,7 @@ echo "🍌 Starting BananaBot deployment..."
 
 # Configuration
 BOT_DIR="/opt/bananabot"
-BOT_USER="bananabot"
 REPO_URL="https://github.com/charlesinzesoussol/bananabot.git"
-
-# Check if running as root
-if [ "$EUID" -ne 0 ]; then
-    echo "Please run as root (use sudo)"
-    exit 1
-fi
 
 # Create bot user if it doesn't exist
 if ! id "$BOT_USER" &>/dev/null; then
