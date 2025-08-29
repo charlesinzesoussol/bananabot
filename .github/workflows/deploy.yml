@@ -36,54 +36,37 @@ jobs:
         username: ${{ secrets.VPS_USER }}
         key: ${{ secrets.VPS_SSH_KEY }}
         port: 22
-        debug: true
+        timeout: 300s
+        command_timeout: 180s
         script: |
+          set -e
           echo "🍌 Starting BananaBot deployment..."
-          whoami
-          pwd
           
-          # Create directory if it doesn't exist
-          echo "Creating bot directory..."
+          # Setup directories
           mkdir -p /opt/bananabot
           cd /opt/bananabot
           
-          # Clone repo if it doesn't exist
-          if [ ! -d ".git" ]; then
-            echo "Cloning repository..."
-            git clone https://github.com/charlesinzesoussol/bananabot.git .
-          else
-            echo "Repository already exists, pulling updates..."
-          fi
-          
-          # Stop the bot if running
-          echo "Stopping existing bot..."
-          pkill -f "python.*slash_bot.py" || true
+          # Stop existing bot
           pkill -f "python.*start.py" || true
+          pkill -f "python.*slash_bot.py" || true
           
-          # Pull latest changes
-          echo "Pulling latest changes..."
-          git pull origin main || echo "Pull failed, continuing..."
-          
-          # Create virtual environment if it doesn't exist
-          if [ ! -d "venv_linux" ]; then
-            echo "Creating virtual environment..."
-            python3 -m venv venv_linux
+          # Setup repository
+          if [ ! -d ".git" ]; then
+            git clone --depth 1 https://github.com/charlesinzesoussol/bananabot.git .
+          else
+            git pull origin main
           fi
           
-          # Update dependencies
-          echo "Installing dependencies..."
-          source venv_linux/bin/activate
-          pip install --upgrade pip
-          pip install -r requirements.txt
+          # Setup Python environment (quick)
+          if [ ! -d "venv_linux" ]; then
+            python3 -m venv venv_linux
+            source venv_linux/bin/activate
+            pip install --no-cache-dir -r requirements.txt
+          else
+            source venv_linux/bin/activate
+            pip install --no-cache-dir --upgrade -r requirements.txt
+          fi
           
-          # Check volume paths
-          echo "Checking volume paths..."
-          python3 check_volume.py || true
-          
-          # Start the bot in background
-          echo "Starting bot..."
+          # Start bot
           nohup python start.py > bananabot.log 2>&1 &
-          sleep 2
-          
-          echo "✅ Bot deployed and started successfully!"
-          echo "Check logs with: tail -f /opt/bananabot/bananabot.log"
+          echo "✅ Bot deployed and started!"
