@@ -1,0 +1,3 @@
+#!/bin/bash
+# Quick metrics check alias
+python3 show_metrics.py

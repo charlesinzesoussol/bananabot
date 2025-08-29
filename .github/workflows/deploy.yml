@@ -129,7 +129,7 @@ jobs:
           MAX_REQUESTS_PER_HOUR=3
           ENABLE_BATCH_PROCESSING=false
           BATCH_SIZE=10
-          BATCH_TIMEOUT=60
+          BATCH_TIMEOUT=1800
           ENABLE_CONTENT_FILTER=true
           ENVEOF
             
