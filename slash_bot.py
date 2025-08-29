@@ -661,7 +661,7 @@ class BananaBot(commands.Bot):
             """Display help information."""
             embed = discord.Embed(
                 title="🍌 BananaBot v1.3.0",
-                description="AI Image Generation Bot with Batch Processing",
+                description="AI Image Generation Bot with Multi-Image Fusion",
                 color=0xFFD700
             )
             
