@@ -12,15 +12,22 @@ DATA_ROOT = None
 
 def get_data_root():
     """Get data root path with VPS volume fallback."""
-    vps_path = Path("/mnt/volume-ash-2/bananabot-data")
+    # Try different possible volume mount paths
+    possible_vps_paths = [
+        Path("/mnt/HC_Volume_103242903/bananabot-data"),  # Volume ID format
+        Path("/mnt/volume-ash-2/bananabot-data"),        # Name format  
+        Path("/volume1/bananabot-data"),                 # Alternative mount
+        Path("/opt/bananabot-data")                      # Alternative location
+    ]
     local_path = Path("data")
     
-    # Check if VPS volume exists and is writable
-    try:
-        if vps_path.parent.exists() and os.access(vps_path.parent, os.W_OK):
-            return vps_path
-    except:
-        pass
+    # Check each possible VPS path
+    for vps_path in possible_vps_paths:
+        try:
+            if vps_path.parent.exists() and os.access(vps_path.parent, os.W_OK):
+                return vps_path
+        except:
+            continue
     
     return local_path
 
