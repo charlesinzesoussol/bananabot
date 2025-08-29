@@ -68,18 +68,20 @@ class RateLimiter:
     Tracks requests per user within a time window and enforces limits.
     """
     
-    def __init__(self, max_requests: int = 10, window_hours: int = 1):
+    def __init__(self, max_requests: int = 10, window_hours: int = 1, cleanup_interval: int = 3600):
         """
         Initialize rate limiter.
         
         Args:
             max_requests: Maximum requests per user in the window
             window_hours: Time window in hours
+            cleanup_interval: Cleanup interval in seconds
         """
         self.max_requests = max_requests
         self.window_hours = window_hours
         self.users: Dict[str, RateLimitInfo] = {}
-        self.cleanup_interval = 3600  # Cleanup every hour
+        self.cleanup_interval = cleanup_interval
+        self._global_lock = asyncio.Lock()  # Global lock for user creation
         
         # Cleanup task will be started when needed
         self._cleanup_task = None
@@ -88,7 +90,7 @@ class RateLimiter:
     
     async def check_user(self, user_id: str) -> bool:
         """
-        Check if user can make a request.
+        Check if user can make a request with atomic check-and-add.
         
         Args:
             user_id: Discord user ID as string
@@ -98,21 +100,25 @@ class RateLimiter:
         """
         # Start cleanup task if not already running
         if self._cleanup_task is None:
-            self._cleanup_task = asyncio.create_task(self._periodic_cleanup())
+            async with self._global_lock:
+                if self._cleanup_task is None:  # Double-check locking pattern
+                    self._cleanup_task = asyncio.create_task(self._periodic_cleanup())
         
-        # Get or create user rate limit info
+        # Get or create user rate limit info with global lock
         if user_id not in self.users:
-            self.users[user_id] = RateLimitInfo(self.max_requests, self.window_hours)
+            async with self._global_lock:
+                if user_id not in self.users:  # Double-check locking pattern
+                    self.users[user_id] = RateLimitInfo(self.max_requests, self.window_hours)
         
         user_info = self.users[user_id]
         
-        # Use lock to prevent race conditions
+        # ATOMIC: check and add in single lock to prevent race conditions
         async with user_info.lock:
             if user_info.is_limited():
-                logger.warning(f"Rate limit exceeded for user {user_id}")
+                logger.warning(f"Rate limit exceeded for user {user_id} ({len(user_info.requests)}/{self.max_requests})")
                 return False
             
-            # Add request and allow
+            # Add request atomically after check
             user_info.add_request()
             logger.debug(f"Request allowed for user {user_id} ({len(user_info.requests)}/{self.max_requests})")
             return True

@@ -2,6 +2,7 @@
 
 import json
 import os
+import tempfile
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
@@ -99,12 +100,34 @@ class UserGallery(BaseModel):
         return next((w for w in self.works if w.id == work_id), None)
     
     def save(self) -> None:
-        """Save gallery to file on mounted volume."""
+        """Save gallery to file on mounted volume with atomic writes."""
         ensure_data_directories()
         
         file_path = get_data_path() / "user_galleries" / f"{self.user_id}.json"
-        with open(file_path, 'w') as f:
-            json.dump(self.model_dump(), f, default=str, indent=2)
+        
+        # Atomic write: write to temp file first, then move
+        with tempfile.NamedTemporaryFile(
+            mode='w', 
+            dir=file_path.parent,
+            suffix='.tmp',
+            delete=False
+        ) as temp_file:
+            try:
+                json.dump(self.model_dump(), temp_file, default=str, indent=2)
+                temp_file.flush()
+                os.fsync(temp_file.fileno())  # Force write to disk
+                
+                # Atomic move (rename is atomic on most filesystems)
+                temp_path = Path(temp_file.name)
+                temp_path.replace(file_path)
+                
+            except Exception:
+                # Clean up temp file on error
+                try:
+                    os.unlink(temp_file.name)
+                except OSError:
+                    pass
+                raise
     
     @classmethod
     def load(cls, user_id: str) -> 'UserGallery':
@@ -132,12 +155,34 @@ class BatchRequest(BaseModel):
     cost_savings: float = Field(default=0.0)
     
     def save(self) -> None:
-        """Save batch request to file on mounted volume."""
+        """Save batch request to file on mounted volume with atomic writes."""
         ensure_data_directories()
         
         file_path = get_data_path() / "batch_requests" / f"{self.batch_id}.json"
-        with open(file_path, 'w') as f:
-            json.dump(self.model_dump(), f, default=str, indent=2)
+        
+        # Atomic write: write to temp file first, then move
+        with tempfile.NamedTemporaryFile(
+            mode='w', 
+            dir=file_path.parent,
+            suffix='.tmp',
+            delete=False
+        ) as temp_file:
+            try:
+                json.dump(self.model_dump(), temp_file, default=str, indent=2)
+                temp_file.flush()
+                os.fsync(temp_file.fileno())  # Force write to disk
+                
+                # Atomic move (rename is atomic on most filesystems)
+                temp_path = Path(temp_file.name)
+                temp_path.replace(file_path)
+                
+            except Exception:
+                # Clean up temp file on error
+                try:
+                    os.unlink(temp_file.name)
+                except OSError:
+                    pass
+                raise
     
     @classmethod
     def load(cls, batch_id: str) -> Optional['BatchRequest']:
@@ -187,12 +232,34 @@ class UserStats(BaseModel):
         self.save()
     
     def save(self) -> None:
-        """Save stats to file on mounted volume."""
+        """Save stats to file on mounted volume with atomic writes."""
         ensure_data_directories()
         
         file_path = get_data_path() / "user_stats" / f"{self.user_id}.json"
-        with open(file_path, 'w') as f:
-            json.dump(self.model_dump(), f, default=str, indent=2)
+        
+        # Atomic write: write to temp file first, then move
+        with tempfile.NamedTemporaryFile(
+            mode='w', 
+            dir=file_path.parent,
+            suffix='.tmp',
+            delete=False
+        ) as temp_file:
+            try:
+                json.dump(self.model_dump(), temp_file, default=str, indent=2)
+                temp_file.flush()
+                os.fsync(temp_file.fileno())  # Force write to disk
+                
+                # Atomic move (rename is atomic on most filesystems)
+                temp_path = Path(temp_file.name)
+                temp_path.replace(file_path)
+                
+            except Exception:
+                # Clean up temp file on error
+                try:
+                    os.unlink(temp_file.name)
+                except OSError:
+                    pass
+                raise
     
     @classmethod
     def load(cls, user_id: str) -> 'UserStats':

@@ -11,13 +11,15 @@ import platform
 import sys
 import uuid
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
+from datetime import datetime
 
+import aiohttp
 import discord
 from discord import app_commands
 from discord.ext import commands
 
-from bot.config import config
+from bot.config import config, ConfigError
 from bot.services.gemini_client import GeminiImageClient
 from bot.services.batch_client_v2 import GeminiBatchProcessor, BatchManager
 from bot.utils.rate_limiter import RateLimiter
@@ -48,6 +50,13 @@ class BananaBot(commands.Bot):
 
     def __init__(self) -> None:
         """Initialize the bot with proper configuration."""
+        # Validate configuration before initializing
+        try:
+            config.validate_config()
+        except ConfigError as e:
+            logger.error(f"Configuration validation failed: {e}")
+            sys.exit(1)
+        
         intents = discord.Intents.default()
         intents.message_content = True
 
@@ -83,7 +92,28 @@ class BananaBot(commands.Bot):
 
         logger.info("Bot setup completed")
     
-    async def _should_use_batch(self, user_id: str, prompts: list) -> bool:
+    async def get_health_status(self) -> dict:
+        """Get health status for monitoring."""
+        status = {
+            "status": "healthy",
+            "timestamp": datetime.utcnow().isoformat(),
+            "services": {
+                "discord": self.is_ready(),
+                "gemini_client": self.gemini_client is not None,
+                "rate_limiter": self.rate_limiter is not None,
+                "batch_processor": self.batch_processor is not None,
+            },
+            "guild_count": len(self.guilds) if hasattr(self, 'guilds') else 0,
+            "user_count": len(self.users) if hasattr(self, 'users') else 0
+        }
+        
+        # Check if all services are healthy
+        if not all(status["services"].values()):
+            status["status"] = "degraded"
+        
+        return status
+    
+    async def _should_use_batch(self, user_id: str, prompts: List[str]) -> bool:
         """Determine if batch processing should be used."""
         if not config.ENABLE_BATCH_PROCESSING:
             return False
@@ -96,7 +126,7 @@ class BananaBot(commands.Bot):
         # and the user doesn't need immediate results
         return False  # Single prompts use regular API for speed
     
-    async def _process_with_batch_or_regular(self, prompts: list, user_id: str, generation_type: str = "create") -> list:
+    async def _process_with_batch_or_regular(self, prompts: List[str], user_id: str, generation_type: str = "create") -> List[dict]:
         """Process prompts using batch or regular API based on configuration."""
         if await self._should_use_batch(user_id, prompts):
             # Use batch processing
@@ -110,7 +140,7 @@ class BananaBot(commands.Bot):
                 processed_results.append({
                     'prompt': prompt,
                     'image_bytes': image_bytes,
-                    'cost': self.batch_processor.batch_cost,  # 50% discount
+                    'cost': config.BATCH_IMAGE_COST,  # 50% discount from config
                     'generation_type': generation_type,
                     'batch_id': batch_id
                 })
@@ -124,7 +154,7 @@ class BananaBot(commands.Bot):
                     processed_results.append({
                         'prompt': prompt,
                         'image_bytes': image_bytes,
-                        'cost': 0.039,  # Standard cost
+                        'cost': config.STANDARD_IMAGE_COST,  # Standard cost from config
                         'generation_type': generation_type,
                         'batch_id': None
                     })
@@ -143,10 +173,11 @@ class BananaBot(commands.Bot):
             self.batch_processor = GeminiBatchProcessor(config.GEMINI_API_KEY)
             self.batch_manager = BatchManager(self.batch_processor)
 
-            # Initialize rate limiter
+            # Initialize rate limiter with configurable cleanup
             self.rate_limiter = RateLimiter(
                 max_requests=config.MAX_REQUESTS_PER_HOUR,
-                window_hours=1
+                window_hours=1,
+                cleanup_interval=config.RATE_LIMITER_CLEANUP_INTERVAL
             )
 
             logger.info("All services initialized successfully")
@@ -166,12 +197,29 @@ class BananaBot(commands.Bot):
             
             user_id = str(interaction.user.id)
             
-            # Check rate limit
+            # Check rate limit with detailed feedback
             if not await self.rate_limiter.check_user(user_id):
+                status = await self.rate_limiter.get_user_status(user_id)
+                reset_time = status.get('reset_time')
+                requests_used = status.get('requests_used', 0)
+                
                 embed = discord.Embed(
-                    title="Rate Limited",
-                    description="You're making requests too quickly. Please wait a moment and try again.",
+                    title="⏰ Rate Limited",
+                    description=f"You've used {requests_used}/{config.MAX_REQUESTS_PER_HOUR} requests this hour.",
                     color=0xE02B2B
+                )
+                if reset_time:
+                    minutes = int(reset_time / 60)
+                    seconds = int(reset_time % 60)
+                    embed.add_field(
+                        name="Reset Time", 
+                        value=f"⏱️ {minutes}m {seconds}s", 
+                        inline=False
+                    )
+                embed.add_field(
+                    name="💡 Tip", 
+                    value="Rate limits help manage API costs and ensure fair usage for all users.", 
+                    inline=False
                 )
                 await interaction.followup.send(embed=embed)
                 return
@@ -239,12 +287,29 @@ class BananaBot(commands.Bot):
             
             user_id = str(interaction.user.id)
             
-            # Check rate limit
+            # Check rate limit with detailed feedback
             if not await self.rate_limiter.check_user(user_id):
+                status = await self.rate_limiter.get_user_status(user_id)
+                reset_time = status.get('reset_time')
+                requests_used = status.get('requests_used', 0)
+                
                 embed = discord.Embed(
-                    title="Rate Limited",
-                    description="You're making requests too quickly. Please wait a moment and try again.",
+                    title="⏰ Rate Limited",
+                    description=f"You've used {requests_used}/{config.MAX_REQUESTS_PER_HOUR} requests this hour.",
                     color=0xE02B2B
+                )
+                if reset_time:
+                    minutes = int(reset_time / 60)
+                    seconds = int(reset_time % 60)
+                    embed.add_field(
+                        name="Reset Time", 
+                        value=f"⏱️ {minutes}m {seconds}s", 
+                        inline=False
+                    )
+                embed.add_field(
+                    name="💡 Tip", 
+                    value="Rate limits help manage API costs and ensure fair usage for all users.", 
+                    inline=False
                 )
                 await interaction.followup.send(embed=embed)
                 return
@@ -319,19 +384,34 @@ class BananaBot(commands.Bot):
             
             user_id = str(interaction.user.id)
             
-            # Check rate limit
+            # Check rate limit with detailed feedback
             if not await self.rate_limiter.check_user(user_id):
+                status = await self.rate_limiter.get_user_status(user_id)
+                reset_time = status.get('reset_time')
+                requests_used = status.get('requests_used', 0)
+                
                 embed = discord.Embed(
-                    title="Rate Limited",
-                    description="You're making requests too quickly. Please wait a moment and try again.",
+                    title="⏰ Rate Limited",
+                    description=f"You've used {requests_used}/{config.MAX_REQUESTS_PER_HOUR} requests this hour.",
                     color=0xE02B2B
+                )
+                if reset_time:
+                    minutes = int(reset_time / 60)
+                    seconds = int(reset_time % 60)
+                    embed.add_field(
+                        name="Reset Time", 
+                        value=f"⏱️ {minutes}m {seconds}s", 
+                        inline=False
+                    )
+                embed.add_field(
+                    name="💡 Tip", 
+                    value="Rate limits help manage API costs and ensure fair usage for all users.", 
+                    inline=False
                 )
                 await interaction.followup.send(embed=embed)
                 return
 
             try:
-                import aiohttp
-                
                 # Download image from URL
                 async with aiohttp.ClientSession() as session:
                     async with session.get(image_url) as response:
@@ -432,7 +512,7 @@ class BananaBot(commands.Bot):
         async def help_command(interaction: discord.Interaction):
             """Display help information."""
             embed = discord.Embed(
-                title="🍌 BananaBot v1.1.0",
+                title="🍌 BananaBot v1.1.1",
                 description="AI Image Generation Bot with Batch Processing",
                 color=0xFFD700
             )
@@ -460,7 +540,7 @@ class BananaBot(commands.Bot):
                 inline=False
             )
             
-            embed.set_footer(text="BananaBot v1.1.0 • Batch Processing & Cost Savings")
+            embed.set_footer(text="BananaBot v1.1.1 • Cost Analysis & Industry Standards")
             await interaction.response.send_message(embed=embed)
 
     async def on_ready(self) -> None:
