@@ -1,0 +1,58 @@
+name: Bot Monitoring & Analytics
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'  # Every 15 minutes
+  workflow_dispatch:
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Check Bot Status
+        run: |
+          # Check if bot is responding
+          curl -f ${{ secrets.VPS_HOST }}:8080/health || echo "Bot down"
+          
+          # Get system metrics via SSH
+          ssh -o ConnectTimeout=10 root@${{ secrets.VPS_HOST }} << 'EOF'
+            echo "=== Bot Status ==="
+            systemctl is-active bananabot
+            
+            echo "=== Memory Usage ==="
+            ps aux | grep python | grep -v grep | awk '{print $4}' | head -1
+            
+            echo "=== Disk Usage ==="
+            df -h /opt/bananabot | tail -1 | awk '{print $5}'
+            
+            echo "=== Recent Activity ==="
+            if [ -f /opt/bananabot/bananabot.log ]; then
+              tail -5 /opt/bananabot/bananabot.log | grep -c "Image generated" || echo "0"
+            else
+              echo "0"
+            fi
+          EOF
+          
+      - name: Generate Metrics JSON
+        run: |
+          cat > metrics.json << EOF
+          {
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "bot_status": "$(systemctl is-active bananabot || echo 'unknown')",
+            "memory_usage": "$(ps aux | grep python | awk '{print $4}' | head -1 || echo '0')",
+            "disk_usage": "$(df -h /opt | tail -1 | awk '{print $5}' | sed 's/%//' || echo '0')",
+            "recent_generations": "$(grep -c 'Image generated' /opt/bananabot/bananabot.log 2>/dev/null || echo '0')"
+          }
+          EOF
+          
+      - name: Commit Metrics
+        run: |
+          mkdir -p monitoring
+          cp metrics.json monitoring/$(date +%Y%m%d_%H%M).json
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add monitoring/
+          git commit -m "📊 Monitoring data $(date)" || exit 0
+          git push
