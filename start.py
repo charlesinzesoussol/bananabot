@@ -5,7 +5,7 @@ import sys
 import logging
 import platform
 import asyncio
-import main_bot  # Import from main_bot.py in project root
+import slash_bot  # Import slash commands bot
 
 if __name__ == "__main__":
     try:
@@ -15,8 +15,8 @@ if __name__ == "__main__":
             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         )
         
-        print("🍌 Starting BananaBot v2.0...")
-        print("📁 Using new template-based architecture")
+        print("🍌 Starting BananaBot - Slash Commands Version")
+        print("📁 Public repository safe version")
         print("🎯 Press Ctrl+C to stop the bot")
         print()
         
@@ -25,7 +25,7 @@ if __name__ == "__main__":
             asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
         
         # Run the bot
-        asyncio.run(main_bot.main())
+        asyncio.run(slash_bot.main())
         
     except KeyboardInterrupt:
         print("\n🍌 BananaBot stopped by user")
