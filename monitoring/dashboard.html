@@ -112,15 +112,17 @@
         }
         
         function showPlaceholderData() {
-            document.getElementById('status').textContent = 'Loading...';
-            document.getElementById('guilds').textContent = 'N/A';
-            document.getElementById('memory').textContent = 'N/A';
-            document.getElementById('downloads').textContent = 'N/A';
-            document.getElementById('activeUsers').textContent = 'N/A';
-            document.getElementById('generations').textContent = 'N/A';
-            document.getElementById('cost').textContent = 'N/A';
-            document.getElementById('disk').textContent = 'N/A';
-            createCharts(); // Create with sample data
+            document.getElementById('status').textContent = 'No Data';
+            document.getElementById('guilds').textContent = 'No Data';
+            document.getElementById('memory').textContent = 'No Data';
+            document.getElementById('downloads').textContent = 'No Data';
+            document.getElementById('activeUsers').textContent = 'No Data';
+            document.getElementById('generations').textContent = 'No Data';
+            document.getElementById('cost').textContent = 'No Data';
+            document.getElementById('disk').textContent = 'No Data';
+            // Don't create charts if no data
+            document.getElementById('memoryChart').parentElement.innerHTML = '<h3>No Data Available</h3><p>Run the monitoring workflow to collect metrics</p>';
+            document.getElementById('activityChart').parentElement.innerHTML = '<h3>No Data Available</h3><p>Run the monitoring workflow to collect metrics</p>';
         }
         
         async function createChartsWithHistoricalData(files) {

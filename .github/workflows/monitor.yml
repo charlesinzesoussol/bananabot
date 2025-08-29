@@ -11,11 +11,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+      
       - name: Check Bot Status & Metrics
         id: metrics
         run: |
-          # Get system metrics via SSH
-          ssh -o ConnectTimeout=30 root@${{ secrets.VPS_HOST }} << 'EOF' > metrics_raw.txt
+          # Try to get system metrics via SSH, fallback on failure
+          if ssh -o ConnectTimeout=30 root@${{ secrets.VPS_HOST }} << 'EOF' > metrics_raw.txt 2>/dev/null
             echo "=== Bot Status ==="
             systemctl is-active bananabot 2>/dev/null || echo "inactive"
             
@@ -60,9 +67,15 @@ jobs:
               echo "0"
             fi
           EOF
+          then
+            echo "Successfully retrieved metrics from VPS"
+          else
+            echo "SSH failed, skipping metrics collection"
+            exit 1
+          fi
           
           # Create 24h marker for next run
-          ssh root@${{ secrets.VPS_HOST }} "touch -d '24 hours ago' /tmp/24h_marker" || true
+          ssh root@${{ secrets.VPS_HOST }} "touch -d '24 hours ago' /tmp/24h_marker" 2>/dev/null || true
           
       - name: Generate Metrics JSON
         run: |

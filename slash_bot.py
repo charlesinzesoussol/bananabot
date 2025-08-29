@@ -82,6 +82,56 @@ class BananaBot(commands.Bot):
         self._add_commands()
 
         logger.info("Bot setup completed")
+    
+    async def _should_use_batch(self, user_id: str, prompts: list) -> bool:
+        """Determine if batch processing should be used."""
+        if not config.ENABLE_BATCH_PROCESSING:
+            return False
+        
+        # Use batch for multiple prompts or if user has pending requests
+        if len(prompts) > 1:
+            return True
+            
+        # For single prompts, use batch if it would provide cost savings
+        # and the user doesn't need immediate results
+        return False  # Single prompts use regular API for speed
+    
+    async def _process_with_batch_or_regular(self, prompts: list, user_id: str, generation_type: str = "create") -> list:
+        """Process prompts using batch or regular API based on configuration."""
+        if await self._should_use_batch(user_id, prompts):
+            # Use batch processing
+            logger.info(f"Using batch processing for {len(prompts)} prompts")
+            batch_id = str(uuid.uuid4())[:8]
+            results = await self.batch_processor.process_batch(prompts, user_id, batch_id)
+            
+            # Convert batch results to standard format
+            processed_results = []
+            for prompt, image_bytes in results:
+                processed_results.append({
+                    'prompt': prompt,
+                    'image_bytes': image_bytes,
+                    'cost': self.batch_processor.batch_cost,  # 50% discount
+                    'generation_type': generation_type,
+                    'batch_id': batch_id
+                })
+            return processed_results
+        else:
+            # Use regular API
+            processed_results = []
+            for prompt in prompts:
+                try:
+                    image_bytes = await self.gemini_client.generate_image(prompt)
+                    processed_results.append({
+                        'prompt': prompt,
+                        'image_bytes': image_bytes,
+                        'cost': 0.039,  # Standard cost
+                        'generation_type': generation_type,
+                        'batch_id': None
+                    })
+                except Exception as e:
+                    logger.error(f"Regular generation failed for prompt '{prompt}': {e}")
+                    # Continue with other prompts
+            return processed_results
 
     async def _init_services(self) -> None:
         """Initialize external services."""
@@ -127,18 +177,24 @@ class BananaBot(commands.Bot):
                 return
 
             try:
-                # Generate image
-                image_bytes = await self.gemini_client.generate_image(prompt)
+                # Process using batch or regular API
+                results = await self._process_with_batch_or_regular([prompt], user_id, "create")
+                
+                if not results:
+                    raise Exception("No results generated")
+                
+                result = results[0]  # Single prompt result
                 
                 # Save to user gallery
                 gallery = UserGallery.load(user_id)
                 work = ImageWork(
                     id=str(uuid.uuid4())[:8],
                     user_id=user_id,
-                    prompt=prompt,
+                    prompt=result['prompt'],
                     image_url=f"work_{str(uuid.uuid4())[:8]}.png",
-                    generation_type="create",
-                    cost=0.039
+                    generation_type=result['generation_type'],
+                    cost=result['cost'],
+                    batch_id=result['batch_id']
                 )
                 gallery.add_work(work)
                 
@@ -147,18 +203,21 @@ class BananaBot(commands.Bot):
                 stats.update_stats(work)
                 
                 # Send result
-                file = discord.File(io.BytesIO(image_bytes), filename=f"{work.id}.png")
+                file = discord.File(io.BytesIO(result['image_bytes']), filename=f"{work.id}.png")
                 
                 embed = discord.Embed(
                     title="🍌 Image Created!",
-                    description=f"**Prompt:** {prompt}",
+                    description=f"**Prompt:** {result['prompt']}",
                     color=0x00FF00
                 )
                 embed.add_field(name="Work ID", value=f"`{work.id}`", inline=True)
+                if result['batch_id']:
+                    embed.add_field(name="Batch ID", value=f"`{result['batch_id']}`", inline=True)
+                    embed.add_field(name="Cost Savings", value="50% off!", inline=True)
                 embed.set_footer(text="Use /gallery to see all your works")
                 
                 await interaction.followup.send(file=file, embed=embed)
-                logger.info(f"Generated image for user {user_id}: {prompt}")
+                logger.info(f"Generated image for user {user_id}: {result['prompt']} (Cost: ${result['cost']:.4f})")
                 
             except Exception as e:
                 logger.error(f"Image generation failed for user {user_id}: {e}")
@@ -373,8 +432,8 @@ class BananaBot(commands.Bot):
         async def help_command(interaction: discord.Interaction):
             """Display help information."""
             embed = discord.Embed(
-                title="🍌 BananaBot Help",
-                description="AI Image Generation Bot",
+                title="🍌 BananaBot v1.1.0",
+                description="AI Image Generation Bot with Batch Processing",
                 color=0xFFD700
             )
             
@@ -401,7 +460,7 @@ class BananaBot(commands.Bot):
                 inline=False
             )
             
-            embed.set_footer(text="BananaBot - AI Image Generation")
+            embed.set_footer(text="BananaBot v1.1.0 • Batch Processing & Cost Savings")
             await interaction.response.send_message(embed=embed)
 
     async def on_ready(self) -> None:

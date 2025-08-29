@@ -32,6 +32,11 @@ class Config:
     # Content Safety
     ENABLE_CONTENT_FILTER: bool = os.getenv("ENABLE_CONTENT_FILTER", "true").lower() == "true"
     
+    # Batch Processing
+    ENABLE_BATCH_PROCESSING: bool = os.getenv("ENABLE_BATCH_PROCESSING", "false").lower() == "true"
+    BATCH_SIZE: int = int(os.getenv("BATCH_SIZE", "10"))
+    BATCH_TIMEOUT: int = int(os.getenv("BATCH_TIMEOUT", "60"))
+    
     @classmethod
     def validate_config(cls) -> None:
         """Validate that all required environment variables are set.
