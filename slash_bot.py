@@ -21,7 +21,7 @@ from bot.config import config
 from bot.services.gemini_client import GeminiImageClient
 from bot.services.batch_client_v2 import GeminiBatchProcessor, BatchManager
 from bot.utils.rate_limiter import RateLimiter
-from bot.models import UserGallery, ImageWork, UserStats
+from bot.models import UserGallery, ImageWork, UserStats, ensure_data_directories
 
 # Ensure .env file exists
 if not os.path.isfile(f"{os.path.realpath(os.path.dirname(__file__))}/.env"):
@@ -71,6 +71,9 @@ class BananaBot(commands.Bot):
         This is where we initialize services and sync commands.
         """
         logger.info("Starting bot setup...")
+
+        # Ensure data directories exist on volume-ash-2
+        ensure_data_directories()
 
         # Initialize services
         await self._init_services()

@@ -7,6 +7,16 @@ from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 from pathlib import Path
 
+# Data storage path - mounted volume for persistence
+DATA_ROOT = Path("/mnt/volume-ash-2/bananabot-data")
+
+def ensure_data_directories():
+    """Ensure all data directories exist on the mounted volume."""
+    (DATA_ROOT / "user_galleries").mkdir(parents=True, exist_ok=True)
+    (DATA_ROOT / "user_stats").mkdir(parents=True, exist_ok=True)
+    (DATA_ROOT / "batch_requests").mkdir(parents=True, exist_ok=True)
+    print(f"Data directories ensured at: {DATA_ROOT}")
+
 class ImageWork(BaseModel):
     """Represents a user's image generation work."""
     
@@ -48,19 +58,18 @@ class UserGallery(BaseModel):
         return next((w for w in self.works if w.id == work_id), None)
     
     def save(self) -> None:
-        """Save gallery to file."""
-        gallery_dir = Path("user_galleries")
-        gallery_dir.mkdir(exist_ok=True)
+        """Save gallery to file on mounted volume."""
+        ensure_data_directories()
         
-        file_path = gallery_dir / f"{self.user_id}.json"
+        file_path = DATA_ROOT / "user_galleries" / f"{self.user_id}.json"
         with open(file_path, 'w') as f:
             json.dump(self.model_dump(), f, default=str, indent=2)
     
     @classmethod
     def load(cls, user_id: str) -> 'UserGallery':
-        """Load gallery from file."""
-        gallery_dir = Path("user_galleries")
-        file_path = gallery_dir / f"{user_id}.json"
+        """Load gallery from file on mounted volume."""
+        ensure_data_directories()
+        file_path = DATA_ROOT / "user_galleries" / f"{user_id}.json"
         
         if file_path.exists():
             with open(file_path, 'r') as f:
@@ -82,19 +91,18 @@ class BatchRequest(BaseModel):
     cost_savings: float = Field(default=0.0)
     
     def save(self) -> None:
-        """Save batch request to file."""
-        batch_dir = Path("batch_requests")
-        batch_dir.mkdir(exist_ok=True)
+        """Save batch request to file on mounted volume."""
+        ensure_data_directories()
         
-        file_path = batch_dir / f"{self.batch_id}.json"
+        file_path = DATA_ROOT / "batch_requests" / f"{self.batch_id}.json"
         with open(file_path, 'w') as f:
             json.dump(self.model_dump(), f, default=str, indent=2)
     
     @classmethod
     def load(cls, batch_id: str) -> Optional['BatchRequest']:
-        """Load batch request from file."""
-        batch_dir = Path("batch_requests")
-        file_path = batch_dir / f"{batch_id}.json"
+        """Load batch request from file on mounted volume."""
+        ensure_data_directories()
+        file_path = DATA_ROOT / "batch_requests" / f"{batch_id}.json"
         
         if file_path.exists():
             with open(file_path, 'r') as f:
@@ -138,19 +146,18 @@ class UserStats(BaseModel):
         self.save()
     
     def save(self) -> None:
-        """Save stats to file."""
-        stats_dir = Path("user_stats")
-        stats_dir.mkdir(exist_ok=True)
+        """Save stats to file on mounted volume."""
+        ensure_data_directories()
         
-        file_path = stats_dir / f"{self.user_id}.json"
+        file_path = DATA_ROOT / "user_stats" / f"{self.user_id}.json"
         with open(file_path, 'w') as f:
             json.dump(self.model_dump(), f, default=str, indent=2)
     
     @classmethod
     def load(cls, user_id: str) -> 'UserStats':
-        """Load stats from file."""
-        stats_dir = Path("user_stats")
-        file_path = stats_dir / f"{user_id}.json"
+        """Load stats from file on mounted volume."""
+        ensure_data_directories()
+        file_path = DATA_ROOT / "user_stats" / f"{user_id}.json"
         
         if file_path.exists():
             with open(file_path, 'r') as f:
