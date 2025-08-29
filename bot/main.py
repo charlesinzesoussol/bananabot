@@ -149,30 +149,18 @@ class BananaBot(commands.Bot):
         async def _handle_help(ctx: commands.Context):
             """Handle help command."""
             embed = discord.Embed(
-                title="🍌 BananaBot Commands v1.5",
-                description="Your friendly AI image creation assistant",
+                title="🍌 BananaBot v1.6",
+                description="Simple AI image bot",
                 color=0xFFD700
             )
             
             embed.add_field(
-                name="🎨 Create Images",
-                value="`!generate <prompt>` - Create an image from your description\\n`!gallery` - View your recent creations\\n`!test` - Check if bot is working",
+                name="Commands",
+                value="`!generate <prompt>` - Make an image\\n`!test` - Test if working",
                 inline=False
             )
             
-            embed.add_field(
-                name="💡 Tips",
-                value="• Attach an image to `!generate` to edit it\\n• Use detailed prompts for better results\\n• All your images are saved in your personal gallery\\n• Try different art styles in your prompts",
-                inline=False
-            )
-            
-            embed.add_field(
-                name="⚠️ Important",
-                value="• Use `!` commands (not `/` commands)\\n• Old slash commands have been removed\\n• Type `!help` to see this message",
-                inline=False
-            )
-            
-            embed.set_footer(text="Made with 🍌 | v1.5 • All slash commands purged | Powered by Google Gemini")
+            embed.set_footer(text="v1.6 - Simple & working")
             
             await ctx.send(embed=embed)
         
@@ -204,7 +192,7 @@ class BananaBot(commands.Bot):
         @self.command(name='test', aliases=['ping'])
         async def test_command(ctx: commands.Context):
             """Test if the bot is responding to commands."""
-            await ctx.send("🍌 Bot is working! v1.5 - All slash command files deleted!")
+            await ctx.send("🍌 Working! v1.6")
     
     async def setup_hook(self) -> None:
         """
@@ -274,12 +262,12 @@ class BananaBot(commands.Bot):
             logger.warning("Bot user is None after ready event")
         logger.info(f"Connected to {len(self.guilds)} guilds")
         
-        # CRITICAL: Clear any old slash commands by syncing empty tree
+        # Clear old slash commands (simple approach)
         try:
-            await self.tree.sync()  # Sync empty tree to clear all slash commands
-            logger.info("✅ Cleared all slash commands from Discord by syncing empty tree")
+            await self.tree.sync()
+            logger.info("✅ Command tree synced")
         except Exception as e:
-            logger.error(f"Failed to clear slash commands: {e}")
+            logger.warning(f"Could not sync command tree: {e}")
         
         # Set bot status
         await self.change_presence(
