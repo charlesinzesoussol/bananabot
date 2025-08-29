@@ -1,101 +1,95 @@
-# BananaBot - Deployment Guide 🚀
+# 🚀 BananaBot VPS Deployment Guide
 
-## Quick Start Deployment
+This guide explains how to deploy BananaBot to your VPS at `178.156.195.131`.
 
-### 1. **Setup Environment**
+## Prerequisites
 
+- VPS with Ubuntu/Debian
+- SSH access to your VPS
+- GitHub repository secrets configured
+- Python 3.9+ installed on VPS
+
+## Initial VPS Setup
+
+### 1. Connect to your VPS
 ```bash
-# Create your .env file from the example
-cp .env.example .env
+ssh root@178.156.195.131
+```
 
-# Edit with your credentials
+### 2. Run the setup script
+```bash
+# Download and run setup script
+wget https://raw.githubusercontent.com/charlesinzesoussol/bananabot/main/scripts/vps-setup.sh
+chmod +x vps-setup.sh
+./vps-setup.sh
+```
+
+### 3. Create .env file
+```bash
+cd ~/bananabot
+nano .env
+```
+
+Add your credentials:
+```env
 DISCORD_TOKEN=your_discord_bot_token_here
 GEMINI_API_KEY=your_gemini_api_key_here
-GUILD_ID=your_test_server_id  # Optional for testing
-LOG_LEVEL=INFO
-MAX_REQUESTS_PER_HOUR=10
 ```
 
-### 2. **Local Development**
+## GitHub Actions Setup
+
+### 1. Add Repository Secrets
+
+Go to your GitHub repository → Settings → Secrets and variables → Actions
+
+Add these secrets:
+
+| Secret Name | Value |
+|------------|-------|
+| `VPS_HOST` | `178.156.195.131` |
+| `VPS_USER` | `root` |
+| `VPS_PORT` | `22` |
+| `VPS_SSH_KEY` | Your private SSH key (full content) |
+| `DISCORD_TOKEN` | Your Discord bot token |
+| `GEMINI_API_KEY` | Your Gemini API key |
+
+### 2. Generate SSH Key (if needed)
+```bash
+# On your local machine
+ssh-keygen -t rsa -b 4096 -f bananabot_deploy
+
+# Copy public key to VPS
+ssh-copy-id -i bananabot_deploy.pub root@178.156.195.131
+
+# Copy private key content for GitHub secret
+cat bananabot_deploy
+```
+
+## Managing the Bot on VPS
+
+### Using Systemd (Recommended)
 
 ```bash
-# Install dependencies
-pip install -r requirements.txt
+# Check status
+sudo systemctl status bananabot
 
-# Run the bot
-python -m bot.main
+# View logs
+sudo journalctl -u bananabot -f
+
+# Restart bot
+sudo systemctl restart bananabot
+
+# Stop bot
+sudo systemctl stop bananabot
 ```
 
-### 3. **Docker Deployment**
+## Automatic Deployment
 
+Simply push to the `main` branch:
 ```bash
-# Build image
-docker build -t bananabot .
-
-# Run container
-docker run -d \
-  --name bananabot \
-  --restart unless-stopped \
-  --env-file .env \
-  bananabot
+git add .
+git commit -m "Update bot"
+git push origin main
 ```
 
-## 📊 Your Cost Breakdown
-
-Based on your configuration:
-
-### **Small Server (100-200 images/day)**
-- **API Cost**: ~$7.50/month
-- **Hosting**: ~$5-10/month  
-- **Total**: **~$13-18/month**
-
-### **Medium Server (500-1000 images/day)**
-- **API Cost**: ~$32-38/month
-- **Hosting**: ~$10-20/month
-- **Total**: **~$42-58/month**
-
-### **Optimization Features Implemented:**
-✅ **Batch Processing** - Save 50% on API costs  
-✅ **Rate Limiting** - Control usage per user  
-✅ **Content Filtering** - Prevent wasted API calls  
-✅ **Image Optimization** - Compress before processing  
-
-## 🎯 Commands Available
-
-- `/generate prompt: "description" style: "optional"`
-- `/imagine prompt: "description" style: "preset_style"`
-- `/edit prompt: "edit instruction" image: [upload]`
-- `/inpaint image: [upload] remove: "object" add: "replacement"`
-- `/compose prompt: "how to merge" image1: [upload] image2: [upload]`
-- `/collage image1: [upload] image2: [upload] style: "artistic"`
-
-## 🔧 Bot Configuration Complete
-
-Your bot is ready with:
-- **Application ID**: `1410744225120915498`
-- **Public Key**: `200a253023c284f5c464a97b47601bcfef2ddb9b8ffbb156271e567676764e14`
-- **Icon**: Custom banana-themed Discord bot icon
-- **API Keys**: Configured for both Discord and Gemini
-
-## 💰 Cost Monitoring
-
-Monitor your usage at:
-- **Google AI Studio**: [Usage Dashboard](https://aistudio.google.com/app/usage)
-- **Set Billing Alerts**: Google Cloud Console → Billing
-- **Bot Logs**: Check `bananabot.log` for usage stats
-
-## 🚨 Security Reminders
-
-- ✅ New API keys generated (old ones were revoked)
-- ✅ Keys stored in `.env` file (not committed to git)
-- ✅ Docker container runs as non-root user
-- ✅ Input validation and content filtering enabled
-
-## Next Steps
-
-1. **Test the bot** in your Discord server
-2. **Monitor usage** for the first week
-3. **Adjust rate limits** based on actual usage
-4. **Enable batch processing** if you get >100 requests/day
-
-Your BananaBot is production-ready! 🍌
+The GitHub Action will automatically deploy to your VPS!
