@@ -203,8 +203,8 @@ class BananaBot(commands.Bot):
                 
                 # Edit image
                 image_bytes = await self.gemini_client.edit_image(
-                    image_data=image_data,
-                    edit_prompt=prompt
+                    prompt=prompt,
+                    image_data=image_data
                 )
                 
                 # Save to user gallery
@@ -279,8 +279,8 @@ class BananaBot(commands.Bot):
                 
                 # Edit image
                 image_bytes = await self.gemini_client.edit_image(
-                    image_data=image_data,
-                    edit_prompt=prompt
+                    prompt=prompt,
+                    image_data=image_data
                 )
                 
                 # Save to user gallery
