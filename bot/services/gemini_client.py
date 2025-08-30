@@ -112,43 +112,16 @@ class GeminiImageClient:
         # PATTERN: Exponential backoff for retries
         for attempt in range(retry_count):
             try:
-                # Convert all images to PIL format
-                pil_images = []
-                for img_data in image_data_list:
-                    try:
-                        pil_image = Image.open(io.BytesIO(img_data))
-                        # Convert to RGB if necessary
-                        if pil_image.mode != 'RGB':
-                            pil_image = pil_image.convert('RGB')
-                        pil_images.append(pil_image)
-                    except Exception as e:
-                        raise GeminiAPIError(f"Failed to process image: {e}")
-                
-                # Create content list with prompt and all images
-                content = [prompt] + pil_images
-                
-                # Generate fused image
-                response = await asyncio.to_thread(
-                    self.client.generate_content,
-                    content
+                # CRITICAL: Run in executor for blocking I/O (same pattern as edit_image)
+                loop = asyncio.get_event_loop()
+                response = await loop.run_in_executor(
+                    None,
+                    self._fuse_sync,
+                    prompt,
+                    image_data_list
                 )
-                
-                # Check for content filtering
-                if response.prompt_feedback and response.prompt_feedback.block_reason:
-                    raise ContentFilterError(f"Content filtered: {response.prompt_feedback.block_reason}")
-                
-                # Extract and return image data
-                if response.candidates and len(response.candidates) > 0:
-                    candidate = response.candidates[0]
-                    
-                    if hasattr(candidate, 'content') and candidate.content.parts:
-                        for part in candidate.content.parts:
-                            if hasattr(part, 'inline_data'):
-                                image_data = part.inline_data.data
-                                logger.info("Successfully fused multiple images")
-                                return image_data
-                
-                raise GeminiAPIError("No image data in response")
+                logger.info("Successfully fused multiple images")
+                return response
                 
             except ContentFilterError:
                 raise  # Don't retry content filter errors
@@ -208,6 +181,65 @@ class GeminiImageClient:
         
         # Should never reach here, but mypy requires this
         raise GeminiAPIError(f"Failed to edit image after {retry_count} attempts")
+    
+    def _fuse_sync(self, prompt: str, image_data_list: list[bytes]) -> bytes:
+        """
+        Synchronous image fusion (runs in executor).
+        
+        Args:
+            prompt: Fusion instruction
+            image_data_list: List of image data as bytes
+            
+        Returns:
+            Fused image data as bytes
+            
+        Raises:
+            ContentFilterError: If prompt is blocked
+            GeminiAPIError: If fusion fails
+        """
+        try:
+            # Convert all images to PIL format
+            pil_images = []
+            for img_data in image_data_list:
+                try:
+                    pil_image = Image.open(io.BytesIO(img_data))
+                    # Convert to RGB if necessary
+                    if pil_image.mode != 'RGB':
+                        pil_image = pil_image.convert('RGB')
+                    pil_images.append(pil_image)
+                except Exception as e:
+                    raise GeminiAPIError(f"Failed to process image: {e}")
+            
+            # Create fusion prompt with images (same pattern as edit)
+            fusion_prompt = f"Fuse and combine these images: {prompt}"
+            
+            # GOTCHA: Gemini expects specific format for prompt+images
+            content = [fusion_prompt] + pil_images
+            response = self.client.generate_content(content)
+            
+            # Check for content filter blocks
+            if response.prompt_feedback and response.prompt_feedback.block_reason:
+                reason = response.prompt_feedback.block_reason.name
+                raise ContentFilterError(f"Fusion prompt blocked by content filter: {reason}")
+            
+            # PATTERN: Extract image from response parts
+            if not response.parts:
+                raise GeminiAPIError("No response parts received")
+            
+            for part in response.parts:
+                if hasattr(part, 'inline_data') and part.inline_data:
+                    return part.inline_data.data
+                elif hasattr(part, 'text') and 'base64' in part.text:
+                    import base64
+                    b64_data = part.text.split('base64,')[-1]
+                    return base64.b64decode(b64_data)
+            
+            raise GeminiAPIError("No fused image data found in response")
+            
+        except ContentFilterError:
+            raise
+        except Exception as e:
+            raise GeminiAPIError(f"Image fusion failed: {e}")
     
     def _generate_sync(self, prompt: str) -> bytes:
         """
