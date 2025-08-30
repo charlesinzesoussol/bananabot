@@ -667,7 +667,7 @@ class BananaBot(commands.Bot):
         async def help_command(interaction: discord.Interaction):
             """Display help information."""
             embed = discord.Embed(
-                title="🍌 BananaBot v1.3.0",
+                title="🍌 BananaBot v1.3.1",
                 description="AI Image Generation Bot with Multi-Image Fusion",
                 color=0xFFD700
             )
@@ -707,7 +707,7 @@ class BananaBot(commands.Bot):
                 inline=False
             )
             
-            embed.set_footer(text="BananaBot v1.3.0 • Multi-Image Fusion & AI Generation")
+            embed.set_footer(text="BananaBot v1.3.1 • Rate-Limited Multi-Image Fusion")
             await interaction.response.send_message(embed=embed)
 
     async def on_ready(self) -> None:
