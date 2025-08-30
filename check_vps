@@ -1,0 +1,40 @@
+#!/bin/bash
+# Get metrics from VPS directly
+
+echo "🍌 FETCHING REAL BOT METRICS FROM VPS..."
+ssh root@65.21.53.76 << 'EOF'
+cd /opt/bananabot 2>/dev/null || { echo "❌ Bot directory not found"; exit 1; }
+
+echo "🍌 BANANABOT REAL METRICS FROM VPS"
+echo "=================================================="
+echo "🕒 Server Time: $(date)"
+echo ""
+
+# Check if bot is running  
+BOT_STATUS=$(systemctl is-active bananabot 2>/dev/null || echo "inactive")
+if [ "$BOT_STATUS" = "active" ]; then
+  echo "🟢 Bot Status: RUNNING"
+else
+  echo "🔴 Bot Status: STOPPED"
+fi
+
+echo ""
+echo "👥 USER DATA:"
+if [ -d "data/user_galleries" ]; then
+  USER_COUNT=$(find data/user_galleries -name "*.json" 2>/dev/null | wc -l)
+  echo "   Total Users: $USER_COUNT"
+  
+  if [ "$USER_COUNT" -gt 0 ]; then
+    echo "   📊 Analyzing real usage data..."
+    python3 show_metrics.py 2>/dev/null || echo "   Using basic analysis..."
+  fi
+else
+  echo "   ❌ No user data directory found"
+fi
+
+echo ""
+echo "📋 RECENT ACTIVITY (last 10 log entries):"
+journalctl -u bananabot --no-pager -n 10 2>/dev/null | grep -E "(generate|Image|Fus)" || echo "   No recent generation activity"
+
+echo "=================================================="
+EOF

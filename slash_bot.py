@@ -218,7 +218,7 @@ class BananaBot(commands.Bot):
                     )
                 embed.add_field(
                     name="💡 Tip", 
-                    value="Rate limits help manage API costs and ensure fair usage for all users.", 
+                    value="Rate limits ensure fair usage and optimal performance for all users.", 
                     inline=False
                 )
                 await interaction.followup.send(embed=embed)
@@ -261,7 +261,7 @@ class BananaBot(commands.Bot):
                 embed.add_field(name="Work ID", value=f"`{work.id}`", inline=True)
                 if result['batch_id']:
                     embed.add_field(name="Batch ID", value=f"`{result['batch_id']}`", inline=True)
-                    embed.add_field(name="Cost Savings", value="50% off!", inline=True)
+                    embed.add_field(name="⚡ Optimized", value="Enhanced processing!", inline=True)
                 embed.set_footer(text="Use /gallery to see all your works")
                 
                 await interaction.followup.send(file=file, embed=embed)
@@ -308,7 +308,7 @@ class BananaBot(commands.Bot):
                     )
                 embed.add_field(
                     name="💡 Tip", 
-                    value="Rate limits help manage API costs and ensure fair usage for all users.", 
+                    value="Rate limits ensure fair usage and optimal performance for all users.", 
                     inline=False
                 )
                 await interaction.followup.send(embed=embed)
@@ -405,7 +405,7 @@ class BananaBot(commands.Bot):
                     )
                 embed.add_field(
                     name="💡 Tip", 
-                    value="Rate limits help manage API costs and ensure fair usage for all users.", 
+                    value="Rate limits ensure fair usage and optimal performance for all users.", 
                     inline=False
                 )
                 await interaction.followup.send(embed=embed)
@@ -508,7 +508,7 @@ class BananaBot(commands.Bot):
                     )
                 embed.add_field(
                     name="💡 Tip",
-                    value="Image fusion counts as 1 request regardless of image count",
+                    value="Image fusion uses 1 rate limit slot regardless of image count",
                     inline=False
                 )
                 
@@ -588,16 +588,16 @@ class BananaBot(commands.Bot):
                     color=0x00FF00
                 )
                 embed.add_field(
-                    name="💰 Cost", 
-                    value=f"${config.STANDARD_IMAGE_COST:.3f}", 
-                    inline=True
-                )
-                embed.add_field(
                     name="🆔 Work ID", 
                     value=work_id, 
                     inline=True
                 )
-                embed.set_footer(text=f"User: {interaction.user.display_name} • BananaBot v1.2.0")
+                embed.add_field(
+                    name="🎨 Images Fused", 
+                    value=f"{len(images)} combined", 
+                    inline=True
+                )
+                embed.set_footer(text=f"User: {interaction.user.display_name} • BananaBot v1.3.0")
                 
                 # Send result with fused image
                 file = discord.File(io.BytesIO(result_image_data), filename=f"fused_{work_id}.png")
