@@ -24,9 +24,9 @@ class Config:
     GEMINI_MODEL: str = "gemini-2.5-flash-image-preview"
     
     # Rate Limiting - Production safe defaults with bounds
-    MAX_REQUESTS_PER_HOUR: int = int(os.getenv("MAX_REQUESTS_PER_HOUR", "5"))
+    MAX_REQUESTS_PER_HOUR: int = int(os.getenv("MAX_REQUESTS_PER_HOUR", "3"))
     """Rate limit per user per hour for standard image commands."""
-    MAX_FUSION_REQUESTS_PER_HOUR: int = int(os.getenv("MAX_FUSION_REQUESTS_PER_HOUR", "2"))
+    MAX_FUSION_REQUESTS_PER_HOUR: int = int(os.getenv("MAX_FUSION_REQUESTS_PER_HOUR", "1"))
     """Rate limit per user per hour for fusion commands (uses more input tokens)."""
     
     # Logging
