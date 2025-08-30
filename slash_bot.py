@@ -173,7 +173,14 @@ class BananaBot(commands.Bot):
             self.batch_processor = GeminiBatchProcessor(config.GEMINI_API_KEY)
             self.batch_manager = BatchManager(self.batch_processor)
 
-            # Initialize rate limiter with configurable cleanup
+            # Initialize rate limiters with different limits
+            # Fusion commands: limited separately (more expensive due to multi-image input tokens)
+            self.fusion_rate_limiter = RateLimiter(
+                max_requests=config.MAX_FUSION_REQUESTS_PER_HOUR,
+                window_hours=1,
+                cleanup_interval=config.RATE_LIMITER_CLEANUP_INTERVAL
+            )
+            # Other image commands: standard rate limit
             self.rate_limiter = RateLimiter(
                 max_requests=config.MAX_REQUESTS_PER_HOUR,
                 window_hours=1,
@@ -487,15 +494,15 @@ class BananaBot(commands.Bot):
             
             user_id = str(interaction.user.id)
             
-            # Check rate limit with detailed feedback
-            if not await self.rate_limiter.check_user(user_id):
-                status = await self.rate_limiter.get_user_status(user_id)
+            # Check fusion-specific rate limit (2 per hour)
+            if not await self.fusion_rate_limiter.check_user(user_id):
+                status = await self.fusion_rate_limiter.get_user_status(user_id)
                 reset_time = status.get('reset_time')
                 requests_used = status.get('requests_used', 0)
                 
                 embed = discord.Embed(
                     title="⏰ Rate Limited",
-                    description=f"You've used {requests_used}/{config.MAX_REQUESTS_PER_HOUR} requests this hour.",
+                    description=f"You've used {requests_used}/{config.MAX_FUSION_REQUESTS_PER_HOUR} fusion requests this hour.",
                     color=0xE02B2B
                 )
                 if reset_time:
@@ -686,6 +693,16 @@ class BananaBot(commands.Bot):
                     "• Use `/generate-link` to edit images from the web\n"
                     "• Use `/fuse-images` to combine 2-5 images creatively\n"
                     "• All your creations are saved in your gallery"
+                ),
+                inline=False
+            )
+            
+            embed.add_field(
+                name="⏰ Rate Limits",
+                value=(
+                    f"• Standard commands: {config.MAX_REQUESTS_PER_HOUR} images per hour\n"
+                    f"• Fusion commands: {config.MAX_FUSION_REQUESTS_PER_HOUR} fusions per hour\n"
+                    "• Limits reset on a rolling hour basis"
                 ),
                 inline=False
             )

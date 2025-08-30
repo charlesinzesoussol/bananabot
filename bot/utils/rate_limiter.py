@@ -217,5 +217,6 @@ class RateLimiter:
         
         logger.info("Rate limiter shutdown complete")
 
-# Global rate limiter instance (will be initialized by bot)
+# Global rate limiter instances (will be initialized by bot)
 default_rate_limiter: Optional[RateLimiter] = None
+fusion_rate_limiter: Optional[RateLimiter] = None  # Separate limiter for fusion commands
